@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import TabBar from "@/components/tab-bar";
+import { SESSION_COOKIE } from "@/lib/data";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,7 +18,9 @@ export const viewport: Viewport = {
   themeColor: "#FFFFFF",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // The tab bar is for signed-in testers; the start screen stands on its own.
+  const signedIn = (await cookies()).has(SESSION_COOKIE);
   return (
     <html lang="ko" className="h-full antialiased">
       <head>
@@ -27,7 +31,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="min-h-full flex flex-col">
         {children}
-        <TabBar />
+        {signedIn && <TabBar />}
       </body>
     </html>
   );
