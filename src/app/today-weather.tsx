@@ -1,5 +1,5 @@
 // Weather card of the 오늘 view: sky-coloured summary, the next six hours, and the 14-hour sheet.
-import { ADVICE_LABEL, hourKind, skyLabel, type DaySummary, type WeatherKind } from "@/lib/advice";
+import { ADVICE_LABEL, hourKind, skyLabel, type DaySummary } from "@/lib/advice";
 import type { DayWx, HourWx } from "@/lib/kma";
 import type { BagItem } from "@/lib/outing";
 import { eventColor } from "@/lib/colors";
@@ -69,32 +69,27 @@ export default function TodayWeather(p: Props) {
   // 폭염 takes over the card when the day's 체감온도 reaches 33° and it is not raining now.
   const heat = !rainingNow && p.summary?.feels != null && p.summary.feels >= 33 ? p.summary.feels : null;
   if (heat !== null) headline = `무더워요 · 체감 ${heat}°`;
-  const theme = heat !== null ? HEAT_THEME : THEMES[kind ?? "partly"];
   const cardIcon = heat !== null ? "heat" : kind;
 
   return (
-    <section className="relative mb-4 overflow-hidden rounded-[24px] px-4 pb-3.5 pt-4" style={{ background: theme.bg, color: theme.ink }}>
-      {theme.pattern && <div className="pointer-events-none absolute inset-0" style={{ backgroundImage: theme.pattern, opacity: 0.55 }} />}
-      <div className="relative">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="font-serif text-[56px] font-bold leading-none">{nowTemp ?? "-"}°</p>
-            <p className="mt-2 text-[15px] font-extrabold">{headline}</p>
-            <p className="mt-1 text-[13px] font-extrabold">
-              {p.summary?.hi != null && <span style={{ color: "#B8473A" }}>↑{p.summary.hi}°</span>}{" "}
-              {p.summary?.lo != null && <span style={{ color: "#2F5A9A" }}>↓{p.summary.lo}°</span>}
-              <span className="font-bold opacity-75">
-                {rainPop !== null ? ` · 비 ${rainPop}%` : ""} · {diffText}
-              </span>
+    <section className="mb-5">
+      <div>
+        {/* A안: one quiet weather line — icon, big temperature, then what it means today. */}
+        <div className="flex items-center gap-3">
+          <WeatherIcon kind={cardIcon} size={44} />
+          <p className="text-[34px] font-extrabold leading-none tracking-[-.03em]">{nowTemp ?? "-"}°</p>
+          <div className="min-w-0 text-[12.5px] leading-[1.5] text-[#6e6e6e]">
+            <p className="truncate">{headline}</p>
+            <p>
+              {p.summary?.hi != null && <b className="text-ink">최고 {p.summary.hi}°</b>}
+              {p.summary?.lo != null && <b className="text-ink"> · 최저 {p.summary.lo}°</b>}
+              {rainPop !== null && <span className="font-bold text-blue"> · 비 {rainPop}%</span>} · {diffText}
             </p>
           </div>
-          <span className="flex h-[84px] w-[84px] flex-none items-center justify-center rounded-[24px] bg-white/65">
-            <WeatherIcon kind={cardIcon} size={64} />
-          </span>
         </div>
 
         {/* The next six hours, always visible. */}
-        <div className="mt-3.5 rounded-[18px] bg-white/70 px-1 pb-2 pt-2.5">
+        <div className="mt-4 border-y border-line pb-2 pt-2.5">
           <div className="grid grid-cols-6 text-center">
             {strip.slice(0, 6).map((s, i) => {
               const pop = s.w?.pop ?? null;
@@ -213,22 +208,3 @@ export default function TodayWeather(p: Props) {
   );
 }
 
-// Card colours follow the sky, staying within the paper-planner palette.
-const HEAT_THEME = {
-  bg: "linear-gradient(160deg,#FFE3C2 0%,#FDB98A 50%,#F48A63 100%)",
-  ink: "#5A1606",
-  pattern: "repeating-radial-gradient(ellipse at 50% 120%, transparent 0 22px, rgba(255,255,255,.18) 22px 25px)",
-};
-const RAIN_STREAKS = "repeating-linear-gradient(105deg, transparent 0 18px, rgba(255,255,255,.35) 18px 19.5px)";
-const THEMES: Record<WeatherKind, { bg: string; ink: string; pattern?: string }> = {
-  rain: { bg: "linear-gradient(160deg,#DDE5F0 0%,#C9D6E8 55%,#B9C8DE 100%)", ink: "#22314F", pattern: RAIN_STREAKS },
-  shower: { bg: "linear-gradient(160deg,#E6ECF3 0%,#D5DEEA 60%,#C8D3E3 100%)", ink: "#22314F", pattern: RAIN_STREAKS },
-  snow: {
-    bg: "linear-gradient(160deg,#F4F7FB 0%,#E4EBF4 100%)",
-    ink: "#22314F",
-    pattern: "radial-gradient(rgba(255,255,255,.9) 1.6px, transparent 1.8px)",
-  },
-  sun: { bg: "linear-gradient(160deg,#FCF3E2 0%,#F8E6C4 60%,#F3D9A6 100%)", ink: "#4A3410" },
-  partly: { bg: "linear-gradient(160deg,#F7F2E8 0%,#ECE8DF 55%,#DDE3EC 100%)", ink: "#2E3442" },
-  cloud: { bg: "linear-gradient(160deg,#EFEEEA 0%,#E2E0DB 60%,#D4D2CC 100%)", ink: "#2E2E2E" },
-};

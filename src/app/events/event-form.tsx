@@ -41,7 +41,7 @@ export default function EventForm({ event, places, defaultDate, upcoming = [], f
 
         <div>
           <span className={fieldLabel}>언제인가요?</span>
-          <div className="grid grid-cols-2 gap-1 rounded-xl bg-[#F1EDE5] p-1 text-sm font-semibold">
+          <div className="grid grid-cols-2 gap-1 rounded-xl bg-[#F0F0F0] p-1 text-sm font-semibold">
             {(["once", "repeat"] as const).map((m) => (
               <button
                 key={m}
@@ -86,7 +86,7 @@ export default function EventForm({ event, places, defaultDate, upcoming = [], f
           <div className="mb-1.5 flex items-center justify-between">
             <span className={`${fieldLabel} mb-0`}>시간</span>
             <label className="flex items-center gap-1.5 text-sm font-semibold text-soft">
-              <input type="checkbox" checked={untimed} onChange={(e) => setUntimed(e.target.checked)} className="h-4 w-4 accent-[#25324A]" />
+              <input type="checkbox" checked={untimed} onChange={(e) => setUntimed(e.target.checked)} className="h-4 w-4 accent-[#3A6FD8]" />
               시간 미정
             </label>
           </div>
@@ -124,7 +124,7 @@ export default function EventForm({ event, places, defaultDate, upcoming = [], f
               </span>
             </span>
             <input type="checkbox" checked={remind} onChange={(e) => setRemind(e.target.checked)} className="peer sr-only" />
-            <span className="relative h-7 w-12 flex-none rounded-full bg-[#E4DED3] transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-6 after:w-6 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:bg-navy peer-checked:after:translate-x-5" />
+            <span className="relative h-7 w-12 flex-none rounded-full bg-[#E4E4E4] transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-6 after:w-6 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:bg-navy peer-checked:after:translate-x-5" />
           </label>
           <input type="hidden" name="remind" value={remind ? "1" : "0"} />
           {remind && untimed && (

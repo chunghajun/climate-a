@@ -19,6 +19,7 @@ export default function Fab({ date }: { date?: string }) {
     if (v) setDim(true);
     else hide.current = setTimeout(() => setDim(false), 240); // after the fade-out
     setOpen(v);
+    document.body.toggleAttribute("data-menu-open", v);
   };
   const from = usePathname() || "/";
   const q = new URLSearchParams({ from, ...(date ? { date } : {}) }).toString();
@@ -35,15 +36,15 @@ export default function Fab({ date }: { date?: string }) {
       {dim && (
         <button
           aria-label="닫기"
-          className="fixed inset-0 z-30 bg-ink/30"
+          className="fixed inset-0 z-30 bg-[rgba(20,24,34,.38)]"
           style={{ opacity: open ? 1 : 0, transition: `opacity ${open ? ".28s" : ".2s"} ease`, animation: open ? "fab-dim .28s ease" : undefined }}
           onClick={() => toggle(false)}
         />
       )}
-      <div className="pointer-events-none fixed bottom-6 left-1/2 z-40 w-full max-w-md -translate-x-1/2 px-5">
+      <div className="pointer-events-none fixed bottom-[calc(76px+env(safe-area-inset-bottom))] left-1/2 z-40 w-full max-w-md -translate-x-1/2 px-5">
         <div
           aria-hidden={!open}
-          className={`mb-3 ml-auto w-64 origin-bottom-right overflow-hidden rounded-[20px] border border-line bg-white shadow-xl ${open ? "pointer-events-auto" : ""}`}
+          className={`mb-3 ml-auto flex w-60 origin-bottom-right flex-col items-stretch gap-2.5 ${open ? "pointer-events-auto" : ""}`}
           style={{
             opacity: open ? 1 : 0,
             transform: open ? "none" : "translateY(10px) scale(.96)",
@@ -56,7 +57,7 @@ export default function Fab({ date }: { date?: string }) {
               href={it.href}
               kind="push"
               tabIndex={open ? 0 : -1}
-              className="block border-b border-line px-4 py-3 last:border-0"
+              className="block rounded-2xl bg-white px-4 py-3 shadow-[0_6px_18px_rgba(0,0,0,.14)]"
               style={{
                 opacity: open ? 1 : 0,
                 transform: open ? "none" : "translateY(6px)",
@@ -65,7 +66,7 @@ export default function Fab({ date }: { date?: string }) {
               }}
               onClick={() => toggle(false)}
             >
-              <span className="block text-[15px] font-bold">{it.title}</span>
+              <span className="block text-[15px] font-extrabold">{it.title}</span>
               <span className="block text-xs text-muted">{it.sub}</span>
             </TLink>
           ))}
@@ -73,7 +74,7 @@ export default function Fab({ date }: { date?: string }) {
         <button
           onClick={() => toggle(!open)}
           aria-label={open ? "메뉴 닫기" : "일정 추가 메뉴"}
-          className="pointer-events-auto ml-auto flex h-14 w-14 items-center justify-center rounded-full bg-ink text-white shadow-[0_10px_22px_rgba(31,29,26,.3)] transition-transform duration-150 active:scale-95"
+          className={`pointer-events-auto ml-auto flex h-[52px] w-[52px] items-center justify-center rounded-full shadow-[0_8px_18px_rgba(58,111,216,.35)] transition-[transform,background-color,color] duration-200 active:scale-95 ${open ? "bg-white text-ink" : "bg-blue text-white"}`}
         >
           <svg
             viewBox="0 0 24 24"

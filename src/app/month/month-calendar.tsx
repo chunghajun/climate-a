@@ -61,7 +61,7 @@ export default function MonthCalendar({ cells, today, initial }: { cells: MonthC
   return (
     <>
       <label className="mb-2 flex items-center justify-end gap-1.5 text-[13px] font-semibold text-soft">
-        <input type="checkbox" checked={hideRepeat} onChange={(e) => toggle(e.target.checked)} className="h-4 w-4 accent-[#25324A]" />
+        <input type="checkbox" checked={hideRepeat} onChange={(e) => toggle(e.target.checked)} className="h-4 w-4 accent-[#3A6FD8]" />
         반복 일정 빼고 보기
       </label>
       <section className="rounded-[20px] border border-line bg-white px-2 pb-2 pt-2.5">
@@ -72,7 +72,7 @@ export default function MonthCalendar({ cells, today, initial }: { cells: MonthC
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-7 border-t border-[#F1EDE5]">
+        <div className="grid grid-cols-7 border-t border-[#F0F0F0]">
           {cells.map((c) => {
             const dow = dowOf(c.date);
             const isToday = c.date === today;
@@ -82,12 +82,12 @@ export default function MonthCalendar({ cells, today, initial }: { cells: MonthC
               <button
                 key={c.date}
                 onClick={() => setSelected(c.date)}
-                className={`flex h-[68px] flex-col justify-start overflow-hidden border-b border-[#F4F1EA] px-0.5 pt-1 text-left ${c.inMonth ? "" : "opacity-30"} ${isSel ? "rounded-[10px] bg-[#FBF3EC] shadow-[inset_0_0_0_1.5px_var(--color-coral)]" : ""}`}
+                className={`flex h-[68px] flex-col justify-start overflow-hidden border-b border-[#F4F4F5] px-0.5 pt-1 text-left ${c.inMonth ? "" : "opacity-30"} ${isSel ? "rounded-[10px] bg-[#FBF3EC] shadow-[inset_0_0_0_1.5px_var(--color-coral)]" : ""}`}
               >
                 <div className="flex h-5 items-center justify-between px-0.5">
                   <b
                     className={`flex h-5 w-5 items-center justify-center rounded-full text-xs font-extrabold ${
-                      isToday ? "bg-navy text-white" : past ? "text-[#9C9588]" : dow === 6 ? "text-lo" : dow === 0 ? "text-coral" : ""
+                      isToday ? "bg-navy text-white" : past ? "text-[#9A9A9A]" : dow === 6 ? "text-lo" : dow === 0 ? "text-coral" : ""
                     }`}
                   >
                     {Number(c.date.slice(8))}
@@ -105,7 +105,7 @@ export default function MonthCalendar({ cells, today, initial }: { cells: MonthC
                     {e.title}
                   </span>
                 ))}
-                {shown(c).length > 2 && <span className="block px-[3px] text-[9px] font-extrabold text-[#9C9588]">+{shown(c).length - 2}</span>}
+                {shown(c).length > 2 && <span className="block px-[3px] text-[9px] font-extrabold text-[#9A9A9A]">+{shown(c).length - 2}</span>}
               </button>
             );
           })}

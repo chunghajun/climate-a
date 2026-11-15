@@ -125,7 +125,7 @@ export default function AlarmList({ initial, back }: { initial: Alarm[]; back: s
                   aria-checked={a.on}
                   aria-label={`${a.time} 알람 ${a.on ? "끄기" : "켜기"}`}
                   onClick={() => persist(alarms.map((x, j) => (j === i ? { ...x, on: !x.on, onceOn: !x.on && !x.days.length ? nextOnce(x.time) : x.onceOn } : x)))}
-                  className={`relative h-8 w-[52px] flex-none rounded-full transition-colors duration-200 ${a.on ? "bg-navy" : "bg-[#E4DED3]"}`}
+                  className={`relative h-8 w-[52px] flex-none rounded-full transition-colors duration-200 ${a.on ? "bg-navy" : "bg-[#E4E4E4]"}`}
                 >
                   <span
                     className="absolute left-0.5 top-0.5 h-7 w-7 rounded-full bg-white shadow"
@@ -161,7 +161,7 @@ export default function AlarmList({ initial, back }: { initial: Alarm[]; back: s
               </button>
             </div>
             <div className="relative mx-4 mb-1.5 mt-2 flex h-[216px] justify-center gap-1.5 overflow-hidden">
-              <div className="pointer-events-none absolute inset-x-2 top-[90px] h-9 rounded-[10px] bg-[#EDE8DF]" />
+              <div className="pointer-events-none absolute inset-x-2 top-[90px] h-9 rounded-[10px] bg-[#ECECEC]" />
               <Wheel items={["오전", "오후"]} index={pick.pm} onPick={(i) => setPick((x) => ({ ...x, pm: i }))} wide />
               <Wheel items={Array.from({ length: 12 }, (_, i) => String(i + 1))} index={pick.h} onPick={(i) => setPick((x) => ({ ...x, h: i }))} />
               <Wheel items={Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"))} index={pick.m} onPick={(i) => setPick((x) => ({ ...x, m: i }))} />

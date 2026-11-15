@@ -7,11 +7,9 @@ import AutoRefresh from "@/components/auto-refresh";
 import Fab from "@/components/fab";
 import HideableLegend from "@/components/hideable-legend";
 import { Legend } from "@/components/icons";
-import PageHeader, { NavArrows } from "@/components/page-header";
-import ViewTabs from "@/components/view-tabs";
+import { CalendarHeader } from "@/components/page-header";
 import MonthCalendar, { type MonthCell } from "./month-calendar";
 
-const MONTHS = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
 
 export default async function MonthPage({ searchParams }: PageProps<"/month">) {
   const tester = await requireTester();
@@ -65,17 +63,10 @@ export default async function MonthPage({ searchParams }: PageProps<"/month">) {
       }),
     };
   });
-  const count = cells.filter((c) => c.inMonth).reduce((n, c) => n + c.events.length, 0);
 
   return (
     <main className="mx-auto w-full max-w-md flex-1 px-5 pb-28 pt-6">
-      <PageHeader
-        kicker={`${year} · ${MONTHS[month - 1]}`}
-        title={`${month}월의 일정`}
-        count={count}
-        right={<NavArrows prev={`/month?m=${offset - 1}`} next={`/month?m=${offset + 1}`} />}
-      />
-      <ViewTabs active="month" />
+      <CalendarHeader view="month" label={`${year}년 ${month}월`} prev={`/month?m=${offset - 1}`} next={`/month?m=${offset + 1}`} />
       <MonthCalendar cells={cells} today={today} initial={offset === 0 ? today : first} />
       <div className="mt-3">
         <HideableLegend>

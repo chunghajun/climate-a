@@ -71,6 +71,21 @@ export default function NotificationCard({ mode }: { mode: "home" | "full" }) {
   if (env === "loading" || (env === "ok" && subscription === undefined)) return null;
   if (mode === "home" && subscription) return null;
 
+  // A안: on the 오늘 screen the ask is a slim grey banner with a blue 켜기.
+  if (mode === "home" && env === "ok") {
+    return (
+      <div className="mb-4 rounded-[14px] bg-gray px-4 py-3 text-[13px] text-[#5a5a5a]">
+        <div className="flex items-center justify-between gap-3">
+          <span>알림을 켜면 기후 알람 시각에 가방을 알려 드려요.</span>
+          <button onClick={subscribe} disabled={busy} className="flex-none font-bold text-blue disabled:opacity-50">
+            켜기
+          </button>
+        </div>
+        {status && <p className="mt-2 text-[12.5px]">{status}</p>}
+      </div>
+    );
+  }
+
   return (
     <section className={card}>
       <h2 className="text-lg font-extrabold">{mode === "home" ? "알림을 켜 주세요" : "알림"}</h2>
@@ -95,7 +110,7 @@ export default function NotificationCard({ mode }: { mode: "home" | "full" }) {
           </>
         )}
 
-        {status && <p className="rounded-lg bg-[#F1EDE5] px-3 py-2 text-sm">{status}</p>}
+        {status && <p className="rounded-lg bg-[#F0F0F0] px-3 py-2 text-sm">{status}</p>}
       </div>
     </section>
   );

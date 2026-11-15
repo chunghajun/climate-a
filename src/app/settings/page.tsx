@@ -4,7 +4,7 @@ import { listPlaces, requireTester } from "@/lib/data";
 import type { AlertPrefs } from "@/lib/types";
 import { logout } from "../actions/auth";
 import { deletePlace, saveAlertPrefs } from "../actions/settings";
-import BackHeader from "@/components/back-header";
+import PageHeader, { GuideButton } from "@/components/page-header";
 import { AdviceBadge } from "@/components/icons";
 import NotificationCard from "@/components/notification-card";
 import SubmitButton from "@/components/submit-button";
@@ -26,8 +26,8 @@ export default async function SettingsPage() {
   const places = (await listPlaces(tester.code)).filter((p) => p.favorite);
 
   return (
-    <main className="mx-auto w-full max-w-md flex-1 space-y-4 px-5 py-6">
-      <BackHeader href="/" title="설정" />
+    <main className="mx-auto w-full max-w-md flex-1 space-y-4 px-5 pb-28 pt-7">
+      <PageHeader title="설정" right={<GuideButton />} />
 
       <NotificationCard mode="full" />
 
@@ -64,7 +64,7 @@ export default async function SettingsPage() {
                   <span className="block text-xs text-muted">{a.sub}</span>
                 </span>
                 <input type="checkbox" name={a.key} defaultChecked={tester.alertPrefs[a.key]} className="peer sr-only" />
-                <span className="relative h-7 w-12 flex-none rounded-full bg-[#E4DED3] transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-6 after:w-6 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:bg-navy peer-checked:after:translate-x-5" />
+                <span className="relative h-7 w-12 flex-none rounded-full bg-[#E4E4E4] transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-6 after:w-6 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:bg-navy peer-checked:after:translate-x-5" />
               </label>
             ))}
           </div>

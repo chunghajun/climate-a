@@ -10,9 +10,8 @@ import AutoRefresh from "@/components/auto-refresh";
 import Fab from "@/components/fab";
 import HideableLegend from "@/components/hideable-legend";
 import { AdviceBadge, Legend, WeatherIcon } from "@/components/icons";
-import PageHeader, { NavArrows } from "@/components/page-header";
+import { CalendarHeader } from "@/components/page-header";
 import Sheet from "@/components/sheet";
-import ViewTabs from "@/components/view-tabs";
 
 const HOUR_PX = 40;
 
@@ -41,8 +40,7 @@ export default async function WeekPage({ searchParams }: PageProps<"/week">) {
 
   return (
     <main className="mx-auto w-full max-w-md flex-1 px-5 pb-28 pt-6">
-      <PageHeader kicker={kicker} title={title} count={all.length} right={<NavArrows prev={`/week?w=${offset - 1}`} next={`/week?w=${offset + 1}`} />} />
-      <ViewTabs active="week" />
+      <CalendarHeader view="week" label={kicker} prev={`/week?w=${offset - 1}`} next={`/week?w=${offset + 1}`} />
 
       <section className="rounded-[20px] border border-line bg-white px-2 pb-2.5 pt-3">
         <div className="flex items-center justify-between px-1.5 pb-2.5">
@@ -119,10 +117,10 @@ export default async function WeekPage({ searchParams }: PageProps<"/week">) {
           {dates.map((d) => (
             <div
               key={d}
-              className={`relative mt-1.5 border-l border-dashed border-[#EEE9DF] ${d === today ? "bg-navy/[.035]" : ""}`}
+              className={`relative mt-1.5 border-l border-dashed border-[#ECECEC] ${d === today ? "bg-navy/[.035]" : ""}`}
               style={{
                 height: (endH - startH) * HOUR_PX,
-                backgroundImage: `repeating-linear-gradient(to bottom, #F1EDE5 0 1px, transparent 1px ${HOUR_PX}px)`,
+                backgroundImage: `repeating-linear-gradient(to bottom, #F0F0F0 0 1px, transparent 1px ${HOUR_PX}px)`,
               }}
             >
               {byDate
@@ -183,7 +181,7 @@ function WeekWeather({ dates, today, summaries }: { dates: string[]; today: stri
           return (
             <div
               key={d}
-              className={`grid grid-cols-[38px_32px_34px_1fr_74px] items-center gap-1.5 border-b border-[#F1EDE5] py-2.5 last:border-0 ${past ? "opacity-45" : ""} ${isToday ? "-mx-3 rounded-[14px] border-transparent bg-[#F3F1EC] px-3" : ""}`}
+              className={`grid grid-cols-[38px_32px_34px_1fr_74px] items-center gap-1.5 border-b border-[#F0F0F0] py-2.5 last:border-0 ${past ? "opacity-45" : ""} ${isToday ? "-mx-3 rounded-[14px] border-transparent bg-[#F4F4F5] px-3" : ""}`}
             >
               <div>
                 <b className="block text-[14.5px]">{DOW[dowOf(d)]}</b>
@@ -200,7 +198,7 @@ function WeekWeather({ dates, today, summaries }: { dates: string[]; today: stri
               {s?.hi != null && s.lo != null ? (
                 <div className="flex items-center gap-1.5 text-[12.5px] font-extrabold">
                   <span className="w-7 text-right text-lo">{s.lo}°</span>
-                  <div className="relative h-1.5 flex-1 rounded-full bg-[#F1EDE5]">
+                  <div className="relative h-1.5 flex-1 rounded-full bg-[#F0F0F0]">
                     <i
                       className="absolute inset-y-0 rounded-full"
                       style={{ left: `${pct(s.lo)}%`, right: `${100 - pct(s.hi)}%`, background: "linear-gradient(90deg,#7F9CC7,#E8B98A 65%,#E2705A)" }}

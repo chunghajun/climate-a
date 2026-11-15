@@ -1,28 +1,33 @@
 @import "tailwindcss";
 
-/* Paper-planner theme (design v4). */
+/* A안 theme: white page, bold black titles, one blue accent. */
 :root {
-  --background: #f8f6f1;
-  --foreground: #1f1d1a;
+  --background: #ffffff;
+  --foreground: #191919;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-paper: #f8f6f1;
-  --color-ink: #1f1d1a;
-  --color-muted: #8c867b;
-  --color-soft: #6e6a63;
-  --color-faint: #b3ac9f;
-  --color-line: #ece7dd;
-  --color-navy: #25324a;
-  /* Older screens use "indigo" for the accent; it is the navy now. */
-  --color-indigo: #25324a;
-  --color-coral: #e2705a;
-  --color-hi: #d9614c;
-  --color-lo: #4a6fa5;
+  --color-paper: #ffffff;
+  --color-ink: #191919;
+  --color-muted: #8b8b8b;
+  --color-soft: #6e6e6e;
+  --color-faint: #b5b5b5;
+  --color-line: #ececec;
+  --color-gray: #f4f4f5;
+  --color-sky: #eef2fc;
+  --color-sky2: #d9e3f8;
+  --color-blue: #3a6fd8;
+  /* Older screens use navy / indigo / coral for the accent; in this theme they are all the blue. */
+  --color-navy: #3a6fd8;
+  --color-indigo: #3a6fd8;
+  --color-coral: #3a6fd8;
+  --color-hi: #e2705a;
+  --color-lo: #3a6fd8;
   --font-sans: "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-  --font-serif: "Gowun Batang", "Nanum Myeongjo", serif;
+  /* Titles that used the serif face are plain bold Pretendard here. */
+  --font-serif: var(--font-sans);
 }
 
 body {

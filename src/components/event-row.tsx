@@ -14,16 +14,16 @@ export default function EventRow({ event: e, place, wx }: { event: CalEvent; pla
       </div>
       {wx?.hasData && <WeatherLine a={wx} />}
       <div className="mt-1.5 flex flex-wrap gap-1.5 text-xs font-semibold">
-        <span className={`rounded-full px-2 py-0.5 ${e.setting === "outdoor" ? "bg-green-100 text-green-800" : "bg-[#F1EDE5] text-muted"}`}>
+        <span className={`rounded-full px-2 py-0.5 ${e.setting === "outdoor" ? "bg-green-100 text-green-800" : "bg-[#F0F0F0] text-muted"}`}>
           {e.setting === "outdoor" ? "야외" : "실내"}
         </span>
-        <span className={`rounded-full px-2 py-0.5 ${e.flexible ? "bg-indigo/10 text-indigo" : "bg-[#F1EDE5] text-muted"}`}>
+        <span className={`rounded-full px-2 py-0.5 ${e.flexible ? "bg-indigo/10 text-indigo" : "bg-[#F0F0F0] text-muted"}`}>
           {e.flexible ? "옮길 수 있음" : "시간 고정"}
         </span>
-        <span className="rounded-full bg-[#F1EDE5] px-2 py-0.5 text-muted">
+        <span className="rounded-full bg-[#F0F0F0] px-2 py-0.5 text-muted">
           {e.untimed ? "출발 알림 없음" : `${departureTime(e)} 출발 · 이동 ${e.travelMin}분`}
         </span>
-        {place && <span className="rounded-full bg-[#F1EDE5] px-2 py-0.5 text-muted">{place.label}</span>}
+        {place && <span className="rounded-full bg-[#F0F0F0] px-2 py-0.5 text-muted">{place.label}</span>}
       </div>
     </Link>
   );

@@ -6,12 +6,12 @@ export default function PageSkeleton({ title, back = false }: { title?: string; 
       {back ? (
         <div className="flex items-center gap-3">
           <span className="h-9 w-9 rounded-full border border-line bg-white" />
-          {title ? <h1 className="font-serif text-[22px] font-bold">{title}</h1> : <span className="h-5 w-24 rounded bg-[#ECE7DD]" />}
+          {title ? <h1 className="font-serif text-[22px] font-bold">{title}</h1> : <span className="h-5 w-24 rounded bg-[#ECECEC]" />}
         </div>
       ) : (
         <>
-          <div className="mb-1 h-3 w-28 rounded bg-[#ECE7DD]" />
-          {title ? <h1 className="font-serif text-[27px] font-bold leading-tight tracking-tight">{title}</h1> : <div className="h-8 w-40 rounded bg-[#ECE7DD]" />}
+          <div className="mb-1 h-3 w-28 rounded bg-[#ECECEC]" />
+          {title ? <h1 className="font-serif text-[27px] font-bold leading-tight tracking-tight">{title}</h1> : <div className="h-8 w-40 rounded bg-[#ECECEC]" />}
           <div className="mb-4 mt-5 h-px bg-line" />
         </>
       )}

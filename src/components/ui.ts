@@ -1,15 +1,16 @@
-// Shared Tailwind class strings so every screen looks the same (paper-planner theme).
+// Shared Tailwind class strings so every screen looks the same (A안 theme).
 
-export const card = "rounded-[20px] border border-line bg-white p-5";
+// A안 sections are flat: separated by a hairline instead of boxed in cards.
+export const card = "border-b border-line pb-6 pt-1";
 export const btnPrimary =
-  "block w-full rounded-2xl bg-navy py-3.5 text-center font-bold text-white disabled:opacity-50";
+  "block w-full rounded-[14px] bg-blue py-3.5 text-center font-extrabold text-white disabled:opacity-50";
 export const btnSecondary =
-  "block w-full rounded-2xl border border-line bg-white py-3 text-center font-semibold text-ink disabled:opacity-50";
+  "block w-full rounded-[14px] bg-gray py-3.5 text-center font-bold text-ink disabled:opacity-50";
 export const input =
-  "w-full rounded-xl border border-line bg-white px-3 py-3 text-base outline-none focus:border-navy";
-export const fieldLabel = "mb-1.5 block text-sm font-semibold text-soft";
+  "w-full rounded-xl border border-transparent bg-gray px-3.5 py-3 text-base outline-none focus:border-blue focus:bg-white";
+export const fieldLabel = "mb-2 block text-[12.5px] font-bold text-muted";
 export const chip =
-  "cursor-pointer select-none rounded-full border border-line bg-white px-3.5 py-2 text-sm font-semibold has-[:checked]:border-navy has-[:checked]:bg-navy has-[:checked]:text-white";
+  "cursor-pointer select-none rounded-full bg-gray px-3.5 py-2 text-sm font-bold text-soft has-[:checked]:bg-blue has-[:checked]:text-white";
 export const pillButton =
-  "inline-flex items-center gap-1 rounded-full border border-line bg-white px-3 py-1.5 text-[12.5px] font-bold text-ink whitespace-nowrap";
-export const sectionLabel = "text-[11px] font-extrabold tracking-[.06em] text-muted";
+  "inline-flex items-center gap-1 rounded-full bg-gray px-3 py-1.5 text-[12.5px] font-bold text-ink whitespace-nowrap";
+export const sectionLabel = "text-[12.5px] font-bold text-muted";

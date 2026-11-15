@@ -46,7 +46,7 @@ export default function CalendarReview({ initial, back, onError }: { initial: Da
               checked={r.on}
               onChange={(e) => update(i, { on: e.target.checked })}
               aria-label="이 일정 넣기"
-              className="h-5 w-5 flex-none accent-[#25324A]"
+              className="h-5 w-5 flex-none accent-[#3A6FD8]"
             />
             <input value={r.title} onChange={(e) => update(i, { title: e.target.value })} maxLength={40} aria-label="제목" className={`${input} min-w-0 py-2.5`} />
           </div>
@@ -66,7 +66,7 @@ export default function CalendarReview({ initial, back, onError }: { initial: Da
                   type="checkbox"
                   checked={r.tbd}
                   onChange={(e) => update(i, e.target.checked ? { tbd: true } : { tbd: false, start: r.start || "09:00", end: r.end || "10:00" })}
-                  className="h-4 w-4 accent-[#25324A]"
+                  className="h-4 w-4 accent-[#3A6FD8]"
                 />
                 시간 미정
               </label>

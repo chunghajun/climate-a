@@ -28,13 +28,13 @@ export function WeatherIcon({ kind, size = 28, className = "" }: { kind: Weather
     case "cloud":
       return (
         <svg {...common}>
-          <path stroke={CLOUD} fill="#EFEDE8" d="M9 24h14a5 5 0 0 0 .7-9.95A7 7 0 0 0 10.2 15.3 4.4 4.4 0 0 0 9 24z" />
+          <path stroke={CLOUD} fill="#F4F4F5" d="M9 24h14a5 5 0 0 0 .7-9.95A7 7 0 0 0 10.2 15.3 4.4 4.4 0 0 0 9 24z" />
         </svg>
       );
     case "rain":
       return (
         <svg {...common}>
-          <path stroke={CLOUD} fill="#EFEDE8" d="M9 19.5h14a5 5 0 0 0 .7-9.95A7 7 0 0 0 10.2 10.8 4.4 4.4 0 0 0 9 19.5z" />
+          <path stroke={CLOUD} fill="#F4F4F5" d="M9 19.5h14a5 5 0 0 0 .7-9.95A7 7 0 0 0 10.2 10.8 4.4 4.4 0 0 0 9 19.5z" />
           <path stroke={RAIN} d="M11.5 23l-1.3 3.2M16.5 23l-1.3 3.2M21.5 23l-1.3 3.2" />
         </svg>
       );
@@ -57,7 +57,7 @@ export function WeatherIcon({ kind, size = 28, className = "" }: { kind: Weather
     case "snow":
       return (
         <svg {...common}>
-          <path stroke={CLOUD} fill="#EFEDE8" d="M9 19.5h14a5 5 0 0 0 .7-9.95A7 7 0 0 0 10.2 10.8 4.4 4.4 0 0 0 9 19.5z" />
+          <path stroke={CLOUD} fill="#F4F4F5" d="M9 19.5h14a5 5 0 0 0 .7-9.95A7 7 0 0 0 10.2 10.8 4.4 4.4 0 0 0 9 19.5z" />
           <path stroke={RAIN} d="M11 24h.01M16 26h.01M21 24h.01M13.5 28h.01M18.5 28h.01" strokeWidth={2.6} />
         </svg>
       );
@@ -89,7 +89,7 @@ const BADGE: Record<AdviceKey, { bg: string; fg: string; path: React.ReactNode }
     fg: "#3F639B",
     path: <><path d="M8.5 3L5 5 3.5 17H6L7.5 9.5V22h9V9.5L18 17h2.5L19 5l-3.5-2L12 9z" /><path d="M8.5 3L12 9l3.5-6" /><path d="M7.5 14.5h9" /></>,
   },
-  o6: { bg: "#E4E8EF", fg: "#25324A", path: <><path d="M9 3h6l1.5 2.5L20 7v14H4V7l3.5-1.5z" /><path d="M12 5.5V21" /><path d="M4 11h16M4 15.5h16" /></> },
+  o6: { bg: "#E4E8EF", fg: "#3A6FD8", path: <><path d="M9 3h6l1.5 2.5L20 7v14H4V7l3.5-1.5z" /><path d="M12 5.5V21" /><path d="M4 11h16M4 15.5h16" /></> },
 };
 
 // `colder` adds a small ↓ when it is much colder than yesterday.
@@ -99,7 +99,7 @@ export function AdviceBadge({ k, size = 26, white = false, colder = false }: { k
     <span
       title={colder ? `${ADVICE_LABEL[k]} · 어제보다 추워요` : ADVICE_LABEL[k]}
       className="relative inline-flex flex-none items-center justify-center"
-      style={{ width: size, height: size, borderRadius: size * 0.34, background: white ? "#fff" : b.bg, color: b.fg }}
+      style={{ width: size, height: size, borderRadius: size * 0.34, background: white ? "#fff" : "#EEF2FC", color: "#3A6FD8" }} // A안: every badge is the one blue
     >
       <svg width={size * 0.62} height={size * 0.62} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
         {b.path}

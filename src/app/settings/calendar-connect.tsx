@@ -52,7 +52,7 @@ export default function CalendarConnect({ url, lastSync }: { url: string | null;
 
   return (
     <div className="mt-3 space-y-3">
-      <div className="grid grid-cols-2 gap-1 rounded-xl bg-[#F1EDE5] p-1 text-sm font-semibold">
+      <div className="grid grid-cols-2 gap-1 rounded-xl bg-[#F0F0F0] p-1 text-sm font-semibold">
         {(["iphone", "google"] as const).map((g) => (
           <button key={g} onClick={() => setGuide(g)} className={`rounded-lg py-2 ${guide === g ? "bg-white shadow-sm" : "text-muted"}`}>
             {g === "iphone" ? "아이폰 캘린더" : "구글 캘린더"}

@@ -1,42 +1,16 @@
 "use client";
 
-// 오늘의 가방: a line-drawn bag beside the day's checklist. Ticking an item slides its icon into the
-// bag and fills it a step; when everything is ticked (or 완료 is pressed) a zipper line is drawn
-// and the card folds into a one-line summary. Tapping the summary opens it again.
-import { useEffect, useId, useRef, useState, useTransition } from "react";
+// 오늘의 가방 (A안): a light-blue bag with a handle and a dashed zipper, the day's items as chips.
+// Ticking a chip sends its name up into the bag; when everything is ticked (or 완료 is pressed) the
+// zipper closes and the card folds into a one-line summary. Tapping the summary opens it again.
+import { useEffect, useRef, useState, useTransition } from "react";
 import { flushSync } from "react-dom";
 import { ADVICE_LABEL, type AdviceKey } from "@/lib/advice";
 import type { BagItem } from "@/lib/outing";
-import { AdviceBadge } from "@/components/icons";
 import { finishBag, setPacked } from "./actions/bag";
 
 const nameOf = (k: AdviceKey) => (k === "range" ? "겉옷" : k === "heat" ? "물" : ADVICE_LABEL[k]);
 const SMOOTH = "cubic-bezier(.4,0,.2,1)";
-const NAVY = "#25324A";
-const FILL = "#E8EDF5";
-// inside of the bag outline, for the fill level
-const INNER = "M13.6 23h36.8a1.5 1.5 0 0 1 1.5 1.6l-1.5 28.3a3.5 3.5 0 0 1-3.5 3.3H17.1a3.5 3.5 0 0 1-3.5-3.3L12.1 24.6a1.5 1.5 0 0 1 1.5-1.6z";
-
-function BagLine({ level, zipped, size, clipId }: { level: number; zipped: boolean; size: number; clipId: string }) {
-  return (
-    <svg viewBox="0 0 64 64" width={size} height={size} className="overflow-visible" aria-hidden>
-      <defs>
-        <clipPath id={clipId}>
-          <path d={INNER} />
-        </clipPath>
-      </defs>
-      <g clipPath={`url(#${clipId})`}>
-        <rect x="0" y="23" width="64" height="35" fill={FILL} style={{ transform: `translateY(${35 * (1 - level)}px)`, transition: `transform .38s ${SMOOTH}` }} />
-      </g>
-      <g fill="none" stroke={NAVY} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M24 21v-4a8 8 0 0 1 16 0v4" />
-        <path d="M13 21h38a3 3 0 0 1 3 3l-1.6 29a5 5 0 0 1-5 4.7H16.6a5 5 0 0 1-5-4.7L10 24a3 3 0 0 1 3-3z" />
-        <path d="M14 28.5h36" strokeDasharray="44" style={{ strokeDashoffset: zipped ? 0 : 44, transition: `stroke-dashoffset .42s ${SMOOTH}` }} />
-        <path d="M44 28.5v5.5" style={{ opacity: zipped ? 1 : 0, transition: "opacity .2s .35s" }} />
-      </g>
-    </svg>
-  );
-}
 
 // What was ticked in this visit to the app, so a prefetched (older) 오늘 page shows the bag as left.
 const latest = new Map<string, { packed: string[]; finished: boolean }>();
@@ -51,21 +25,22 @@ export default function TodayBag(props: { date: string; bag: BagItem[]; packed: 
     latest.set(date, { packed, finished });
   }, [date, packed, finished]);
   const [, start] = useTransition();
-  const id = useId().replace(/:/g, "");
-  const card = useRef<HTMLElement>(null);
+  const card = useRef<HTMLDivElement>(null);
   const open = useRef<HTMLDivElement>(null);
   const summary = useRef<HTMLButtonElement>(null);
-  const bagIcon = useRef<HTMLDivElement>(null);
+  const bagIcon = useRef<HTMLSpanElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const folding = useRef(false);
 
   if (bag.length === 0) {
     return (
-      <section className="mb-3 flex items-center gap-3 rounded-[22px] border border-line bg-white px-4 py-3">
-        <BagLine level={0} zipped size={30} clipId={`${id}e`} />
-        <p className="text-sm font-bold">
-          <span className="mr-2 text-[11.5px] font-extrabold tracking-[.06em] text-muted">오늘의 가방</span>따로 챙길 건 없어요
-        </p>
+      <section className="relative mb-5 pt-[18px]">
+        <Handle zipped />
+        <div className="relative rounded-[24px] bg-sky px-4 pb-4 pt-7 text-center">
+          <Zipper zipped />
+          <h3 className="text-[15.5px] font-extrabold">오늘의 가방</h3>
+          <p className="mt-1.5 text-[12.5px] text-[#5a5a5a]">따로 챙길 건 없어요</p>
+        </div>
       </section>
     );
   }
@@ -75,6 +50,7 @@ export default function TodayBag(props: { date: string; bag: BagItem[]; packed: 
   const zipped = n === all || finished;
   const inBag = bag.filter((b) => packed.includes(b.key)).map((b) => nameOf(b.key));
   const left = bag.filter((b) => !packed.includes(b.key)).map((b) => nameOf(b.key));
+  const why = [...new Set(bag.map((b) => b.reason).filter(Boolean))].join(" · ");
 
   // Folding: the open part fades out, the card eases to its new height, the other part fades in.
   async function fold(toCollapsed: boolean, before?: () => void) {
@@ -139,39 +115,32 @@ export default function TodayBag(props: { date: string; bag: BagItem[]; packed: 
   }
 
   return (
-    <section ref={card} className="mb-3 overflow-hidden rounded-[22px] border border-line bg-white shadow-[0_1px_2px_rgba(40,34,24,.04)]">
-      {collapsed ? (
-        <button ref={summary} type="button" onClick={() => fold(false, () => setFinished(false))} className="flex w-full items-center gap-3 px-4 py-3 text-left">
-          <BagLine level={n / all} zipped size={30} clipId={`${id}s`} />
-          <span className="min-w-0 flex-1">
-            <b className="block text-sm">준비 완료</b>
-            <span className="block truncate text-xs font-semibold text-muted">
-              {inBag.length ? inBag.join(" · ") : "챙긴 것 없음"}
-              {left.length > 0 && <span className="text-faint"> · {left.join(", ")} 빼고</span>}
+    <section className="relative mb-5 pt-[18px]">
+      <Handle zipped={zipped} small={collapsed} />
+      <span ref={bagIcon} className="absolute left-1/2 top-0 h-8 w-10 -translate-x-1/2" aria-hidden />
+      <div ref={card} className="relative overflow-hidden rounded-[24px] bg-sky">
+        <Zipper zipped={zipped} />
+        {collapsed ? (
+          <button ref={summary} type="button" onClick={() => fold(false, () => setFinished(false))} className="flex w-full items-center gap-3 px-4 pb-3.5 pt-[22px] text-left">
+            <span className="min-w-0 flex-1">
+              <b className="block text-[14.5px] font-extrabold">{left.length ? "준비 완료" : "가방 다 챙겼어요"}</b>
+              <span className="mt-0.5 block truncate text-[12.5px] text-[#5a5a5a]">
+                {inBag.length ? inBag.join(" · ") : "챙긴 것 없음"}
+                {left.length > 0 && <span className="text-muted"> · {left.join(", ")} 빼고</span>}
+              </span>
             </span>
-          </span>
-          <span className="text-faint">⌄</span>
-        </button>
-      ) : (
-        <div ref={open}>
-          <div className="flex items-center justify-between px-4 pt-3.5">
-            <span className="text-[11.5px] font-extrabold tracking-[.06em] text-muted">오늘의 가방</span>
-            <span className="flex items-center gap-2.5">
-              <span className="text-xs font-extrabold tabular-nums text-soft">
+            <span className="text-[13px] font-bold text-blue">펼치기</span>
+          </button>
+        ) : (
+          <div ref={open} className="px-4 pb-4 pt-7 text-center">
+            <h3 className="text-[15.5px] font-extrabold">
+              오늘의 가방
+              <span className="ml-1.5 text-[12px] font-bold tabular-nums text-blue">
                 {n}/{all}
               </span>
-              <button type="button" onClick={finish} className="rounded-full border border-line px-3 py-1 text-xs font-extrabold text-navy active:bg-navy active:text-white">
-                완료
-              </button>
-            </span>
-          </div>
-          <div className="flex items-center gap-3.5 px-4 pb-3.5 pt-2.5">
-            <div ref={bagIcon} className="flex w-[78px] flex-none flex-col items-center">
-              <BagLine level={n / all} zipped={zipped} size={78} clipId={`${id}o`} />
-              <span className="mt-0.5 min-h-[14px] text-center text-[10.5px] font-bold text-muted">{zipped ? "준비 완료" : n ? `${all - n}개 남았어요` : ""}</span>
-            </div>
-            <div className="min-w-0 flex-1">
-              {bag.map((b, i) => {
+            </h3>
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              {bag.map((b) => {
                 const on = packed.includes(b.key);
                 return (
                   <button
@@ -179,30 +148,58 @@ export default function TodayBag(props: { date: string; bag: BagItem[]; packed: 
                     type="button"
                     onClick={(e) => toggle(b, e.currentTarget)}
                     aria-pressed={on}
-                    className={`flex w-full items-center gap-2.5 py-[7px] text-left ${i > 0 ? "border-t border-[#F3EFE8]" : ""}`}
+                    className={`inline-flex items-center gap-2 rounded-full py-2 pl-2.5 pr-3.5 text-[14px] font-bold shadow-[0_1px_2px_rgba(30,50,100,.06)] transition-colors duration-200 ${on ? "bg-blue text-white" : "bg-white text-ink"}`}
                   >
-                    <span data-badge className={`transition-opacity duration-200 ${on ? "opacity-35" : ""}`}>
-                      <AdviceBadge k={b.key} size={30} colder={b.colder} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <b className={`block text-sm leading-tight transition-colors duration-200 ${on ? "text-faint" : ""}`}>{nameOf(b.key)}</b>
-                      <span className="block truncate text-[11.5px] font-semibold text-muted">{b.reason}</span>
-                    </span>
                     <span
-                      className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-full border-[1.6px] transition-colors duration-200"
-                      style={{ background: on ? NAVY : "transparent", borderColor: on ? NAVY : "#CFC8BB" }}
+                      className={`flex h-5 w-5 flex-none items-center justify-center rounded-full border-2 transition-colors duration-200 ${on ? "border-white bg-white" : "border-[#9a9a9a]"}`}
                     >
-                      <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                      <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke={BLUE} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M2.5 6.2l2.4 2.4 4.6-5" strokeDasharray="16" style={{ strokeDashoffset: on ? 0 : 16, transition: "stroke-dashoffset .22s .06s ease-out" }} />
                       </svg>
                     </span>
+                    <span data-badge>{nameOf(b.key)}</span>
                   </button>
                 );
               })}
             </div>
+            {why && <p className="mt-3 text-[12.5px] leading-relaxed text-[#5a5a5a]">{why}</p>}
+            <button type="button" onClick={finish} className="mt-2.5 px-3 py-1 text-[13px] font-extrabold text-blue">
+              완료
+            </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </section>
+  );
+}
+
+const BLUE = "#3A6FD8";
+
+// The bag's handle: an arc above the card. It shrinks when the card is folded.
+function Handle({ zipped, small }: { zipped: boolean; small?: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className="absolute left-1/2 top-0 -translate-x-1/2 rounded-t-full border-x-[5px] border-t-[5px] border-blue transition-[width,height,opacity] duration-300"
+      style={{ width: small ? 72 : 96, height: small ? 30 : 44, opacity: zipped || !small ? 1 : 0.85 }}
+    />
+  );
+}
+
+// Dashed zipper line with a pull tab; it turns solid when everything is packed.
+function Zipper({ zipped }: { zipped: boolean }) {
+  return (
+    <>
+      <span
+        aria-hidden
+        className="absolute left-[22px] right-[22px] top-3.5 border-t-2 transition-colors duration-300"
+        style={{ borderStyle: zipped ? "solid" : "dashed", borderColor: zipped ? BLUE : "#AFC3EC" }}
+      />
+      <span
+        aria-hidden
+        className="absolute top-2 h-[13px] w-9 -translate-x-1/2 rounded-[7px] bg-blue transition-[left] duration-500"
+        style={{ left: zipped ? "calc(100% - 40px)" : "50%" }}
+      />
+    </>
   );
 }
