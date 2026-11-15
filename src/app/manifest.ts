@@ -2,13 +2,13 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "CliMate",
-    short_name: "CliMate",
+    name: "CliMate A",
+    short_name: "CliMate A",
     description: "내 일정에 맞춘 날씨 알림",
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",
-    theme_color: "#1E2547",
+    theme_color: "#FFFFFF",
     lang: "ko",
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png" },

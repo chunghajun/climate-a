@@ -5,11 +5,11 @@ import { SESSION_COOKIE } from "@/lib/data";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CliMate",
+  title: "CliMate A",
   description: "내 일정에 맞춘 날씨 알림",
   appleWebApp: {
     capable: true,
-    title: "CliMate",
+    title: "CliMate A",
     statusBarStyle: "default",
   },
 };
