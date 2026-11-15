@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+/* Paper-planner theme (design v4). */
+:root {
+  --background: #f8f6f1;
+  --foreground: #1f1d1a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-paper: #f8f6f1;
+  --color-ink: #1f1d1a;
+  --color-muted: #8c867b;
+  --color-soft: #6e6a63;
+  --color-faint: #b3ac9f;
+  --color-line: #ece7dd;
+  --color-navy: #25324a;
+  /* Older screens use "indigo" for the accent; it is the navy now. */
+  --color-indigo: #25324a;
+  --color-coral: #e2705a;
+  --color-hi: #d9614c;
+  --color-lo: #4a6fa5;
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-serif: "Gowun Batang", "Nanum Myeongjo", serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  word-break: keep-all;
+  -webkit-font-smoothing: antialiased;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+/* + menu backdrop fade-in (it is mounted already visible) */
+@keyframes fab-dim {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
