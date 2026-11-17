@@ -4,7 +4,8 @@
 export type NotifyMode = "first" | "fixed";
 export type Notify = { on: boolean; mode: NotifyMode; leadMin: number };
 
-export const DEFAULT_NOTIFY: Notify = { on: true, mode: "first", leadMin: 60 };
+// "fixed" keeps what testers already had (the 기후 알람 times) until they choose otherwise.
+export const DEFAULT_NOTIFY: Notify = { on: true, mode: "fixed", leadMin: 60 };
 export const MAX_LEAD = 3 * 60;
 
 export function notifyOf(doc: { notify?: unknown } | undefined): Notify {
