@@ -1,4 +1,5 @@
 import type { Alarm } from "./alarms";
+import type { Notify } from "./notify";
 
 // Which push alerts the tester wants (screen icons always show).
 export type AlertPrefs = {
@@ -28,6 +29,7 @@ export type Tester = {
   icsUrl: string | null;
   icsLastSync: string | null;
   alarms: Alarm[]; // 기후 알람
+  notify: Notify; // 알림 on/off and when
 };
 
 export type Place = {

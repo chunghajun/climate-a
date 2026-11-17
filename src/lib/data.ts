@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { FieldValue, type DocumentData } from "firebase-admin/firestore";
 import { alarmsOf } from "./alarms";
+import { notifyOf } from "./notify";
 import { db } from "./firebase";
 import { DEFAULT_ALERT_PREFS, type CalEvent, type Place, type Tester } from "./types";
 
@@ -27,6 +28,7 @@ export async function getTester(): Promise<Tester | null> {
     icsUrl: d.icsUrl ?? null,
     icsLastSync: d.icsLastSync ? d.icsLastSync.toDate().toISOString() : null,
     alarms: alarmsOf(d),
+    notify: notifyOf(d),
   };
 }
 

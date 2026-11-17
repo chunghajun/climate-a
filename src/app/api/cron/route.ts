@@ -6,6 +6,7 @@ import { listEvents, listPlaces, logEvent, testerRef } from "@/lib/data";
 import { bigRange } from "@/lib/advice";
 import { syncIcs } from "@/lib/ics";
 import { alarmsOf, ringsOn } from "@/lib/alarms";
+import { notifyOf } from "@/lib/notify";
 import { DEFAULT_ALERT_PREFS, type CalEvent } from "@/lib/types";
 import { gridKey, toGrid, type Grid } from "@/lib/kma";
 import { refreshGrid } from "@/lib/weather";
@@ -95,8 +96,15 @@ export async function GET(request: Request) {
         const next = Math.min(minutes + RECHECK, ...times.filter((m) => m > minutes));
         await testerRef(code).update({ cronNextAt: Date.now() + (next - minutes) * 60_000 - 45_000 });
       };
-      // 기후 알람 times today (and tomorrow, for the next check).
-      const allAlarms = alarmsOf(t.data());
+      // 알림 off: nothing is pushed. Look again in a few hours; switching it on wakes the cron at once.
+      const notify = notifyOf(t.data());
+      if (!notify.on) {
+        await testerRef(code).update({ cronNextAt: Date.now() + 6 * 3600_000 });
+        summary.idle++;
+        return;
+      }
+      // 기후 알람 times today (and tomorrow, for the next check) — in "정한 시각" mode only.
+      const allAlarms = notify.mode === "fixed" ? alarmsOf(t.data()) : [];
       const alarmsToday = allAlarms.filter((a) => ringsOn(a, date, dowOf(date))).map((a) => toMinutes(a.time));
       const alarmsTomorrow = allAlarms.filter((a) => ringsOn(a, tomorrow, dowOf(tomorrow))).map((a) => 1440 + toMinutes(a.time));
       // One-time alarms that have rung switch themselves off (like the phone's).
@@ -106,6 +114,11 @@ export async function GET(request: Request) {
       const plannedDays = places.length && events.length ? await planDays(events, places, [date, tomorrow]) : new Map<string, PlannedOuting[]>();
       const planned = plannedDays.get(date) ?? [];
       const prefs = { ...DEFAULT_ALERT_PREFS, ...(t.data().alertPrefs ?? {}) };
+      // "첫 외출 전" mode: one alert the chosen time before the day's first trip (none without trips).
+      const firstAlert = (trips: PlannedOuting[] | undefined) =>
+        trips?.length ? [Math.max(0, Math.min(...trips.map((p) => p.outing.depart)) - notify.leadMin)] : [];
+      const ringToday = notify.mode === "first" ? firstAlert(planned) : alarmsToday;
+      const ringTomorrow = notify.mode === "first" ? firstAlert(plannedDays.get(tomorrow)).map((m) => 1440 + m) : alarmsTomorrow;
 
       // 일정 알림 due now: today's events, plus tomorrow's early ones whose reminder falls tonight.
       // 시간 미정 events ring at their own time of day (remindAt) instead.
@@ -117,12 +130,12 @@ export async function GET(request: Request) {
         .map((r) => ({ ...r, at: r.at === null ? null : r.date === date ? r.at : 1440 + r.at }))
         .filter((r): r is { e: CalEvent; date: string; at: number } => r.at !== null);
       const reminders = allReminders.filter((r) => r.at <= minutes && r.at > minutes - CATCH_UP);
-      await sleepUntil([...alarmsToday, ...alarmsTomorrow, ...allReminders.map((r) => r.at)]);
+      await sleepUntil([...ringToday, ...ringTomorrow, ...allReminders.map((r) => r.at)]);
       const merged = new Set<string>(); // 일정 알림 sent along with the alarm (none for now)
 
-      // 기후 알람: at each alarm time, the day's weather and bag — for the trips still ahead,
+      // 기후 알람 / 첫 외출 알림: the day's weather and bag — for the trips still ahead,
       // or just the local weather when there are none.
-      for (const at of alarmsToday) {
+      for (const at of ringToday) {
         if (at > minutes || at <= minutes - CATCH_UP) continue;
         summary.due++;
         const trips = planned.filter((p) => p.outing.back > at && p.a.hasData);
@@ -134,7 +147,8 @@ export async function GET(request: Request) {
           : today && today.hi != null
             ? composeWeatherOnly(today, { prefs, range })
             : null;
-        const alertId = `${code}_${date}_alarm_${fromMinutes(at).replace(":", "")}`;
+        // "first" goes out once a day even if the lead time is changed afterwards
+        const alertId = notify.mode === "first" ? `${code}_${date}_first` : `${code}_${date}_alarm_${fromMinutes(at).replace(":", "")}`;
         const ref = db().collection("alerts").doc(alertId);
         const worst = [...trips].sort((x, y) => (y.a.pop ?? 0) - (x.a.pop ?? 0))[0];
         try {
@@ -142,7 +156,7 @@ export async function GET(request: Request) {
           await ref.create({
             code,
             date,
-            kind: "alarm",
+            kind: notify.mode === "first" ? "first" : "alarm",
             alarm: fromMinutes(at),
             eventIds: trips.flatMap((p) => p.outing.events.map((e) => e.id)),
             titles: trips.flatMap((p) => p.outing.events.map((e) => e.title)),
@@ -164,7 +178,7 @@ export async function GET(request: Request) {
         }
         const delivered = await pushTo(code, { ...message, tag: alertId, url: `/a/${alertId}` });
         await ref.update({ delivered, sentAt: FieldValue.serverTimestamp() });
-        logEvent(code, "alert_sent", { alertId, kind: "alarm", trips: trips.length, level: worst?.a.level ?? null, delivered });
+        logEvent(code, "alert_sent", { alertId, kind: notify.mode === "first" ? "first" : "alarm", trips: trips.length, level: worst?.a.level ?? null, delivered });
         summary.sent++;
       }
 

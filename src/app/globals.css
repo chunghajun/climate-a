@@ -57,3 +57,29 @@ body {
     opacity: 0.55;
   }
 }
+
+/* ---- 달력: one calendar that stretches from month to week (app/calendar) ----
+   The row height lives in --rh on the scroller; data-lv picks what a day shows:
+   0 점 · 1 막대 · 2 제목 블록 · 3 시간·장소까지 (주간). Zooming only changes these two. */
+.cal-sc { --rh: 70px; }
+.cal-wk { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); height: var(--rh); border-top: 1px solid #f1f2f4; overflow: hidden; }
+.cal-ml { height: 28px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); align-items: end; padding-bottom: 3px; font-size: 14px; font-weight: 800; color: var(--color-blue); }
+.cal-c { position: relative; min-width: 0; overflow: hidden; padding: 6px 1px 0; text-align: center; cursor: pointer; }
+.cal-n { display: inline-flex; min-width: 26px; height: 26px; padding: 0 3px; align-items: center; justify-content: center; border-radius: 13px; font-size: 15px; font-variant-numeric: tabular-nums; }
+.cal-w { height: 24px; display: flex; align-items: center; justify-content: center; }
+.cal-dots { display: flex; justify-content: center; gap: 3px; height: 5px; margin-top: 4px; }
+.cal-dots i { width: 5px; height: 5px; border-radius: 50%; }
+.cal-bars, .cal-blocks { display: none; }
+.cal-bars i { display: block; height: 4px; border-radius: 2px; margin: 0 3px 3px; }
+.cal-blk { margin: 0 1px 2px; padding: 2px 3px; border-radius: 4px; font-size: 10px; line-height: 1.25; text-align: left; white-space: nowrap; overflow: hidden; }
+.cal-blk small { display: none; font-size: 9px; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; word-break: normal; }
+.cal-sc[data-lv="1"] .cal-dots, .cal-sc[data-lv="2"] .cal-dots, .cal-sc[data-lv="3"] .cal-dots { display: none; }
+.cal-sc[data-lv="1"] .cal-bars { display: block; margin-top: 4px; }
+.cal-sc[data-lv="2"] .cal-blocks, .cal-sc[data-lv="3"] .cal-blocks { display: block; margin-top: 3px; }
+.cal-sc[data-lv="3"] .cal-blk { white-space: normal; word-break: break-all; padding: 3px 4px; }
+.cal-sc[data-lv="3"] .cal-blk small { display: block; }
+.cal-c.sun .cal-n { color: #e5484d; }
+.cal-c.sat .cal-n { color: var(--color-blue); }
+.cal-c.past .cal-n { opacity: .45; }
+.cal-c.today .cal-n { background: var(--color-blue); color: #fff; font-weight: 800; opacity: 1; }
+.cal-c.sel:not(.today) .cal-n { box-shadow: inset 0 0 0 1.6px var(--color-blue); color: var(--color-blue); font-weight: 800; }

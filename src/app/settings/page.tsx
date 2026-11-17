@@ -1,4 +1,3 @@
-import { TLink } from "@/components/nav-transition";
 import { daysLabel } from "@/lib/alarms";
 import { listPlaces, requireTester } from "@/lib/data";
 import type { AlertPrefs } from "@/lib/types";
@@ -6,7 +5,7 @@ import { logout } from "../actions/auth";
 import { deletePlace, saveAlertPrefs } from "../actions/settings";
 import PageHeader, { GuideButton } from "@/components/page-header";
 import { AdviceBadge } from "@/components/icons";
-import NotificationCard from "@/components/notification-card";
+import NotifySettings from "./notify-settings";
 import SubmitButton from "@/components/submit-button";
 import { btnSecondary, card } from "@/components/ui";
 import CalendarConnect from "./calendar-connect";
@@ -29,50 +28,48 @@ export default async function SettingsPage() {
     <main className="mx-auto w-full max-w-md flex-1 space-y-4 px-5 pb-28 pt-7">
       <PageHeader title="설정" right={<GuideButton />} />
 
-      <NotificationCard mode="full" />
+      <NotifySettings
+        initial={tester.notify}
+        alarmsLabel={
+          tester.alarms.filter((a) => a.on).length
+            ? tester.alarms
+                .filter((a) => a.on)
+                .sort((a, b) => a.time.localeCompare(b.time))
+                .map((a) => `${daysLabel(a.days)} ${a.time}`)
+                .join(" · ")
+            : "켜 둔 시각이 없어요"
+        }
+      />
 
-      <TLink href="/alarms?from=/settings" kind="push" className={`${card} flex items-center justify-between`}>
-        <span>
-          <b className="block font-serif text-lg">기후 알람</b>
-          <span className="block text-sm text-soft">
-            {tester.alarms.filter((a) => a.on).length
-              ? tester.alarms
-                  .filter((a) => a.on)
-                  .sort((a, b) => a.time.localeCompare(b.time))
-                  .map((a) => `${daysLabel(a.days)} ${a.time}`)
-                  .join(" · ")
-              : "켜 둔 알람이 없어요"}
-          </span>
-        </span>
-        <span className="text-xl text-faint">›</span>
-      </TLink>
-
-      <section className={card}>
-        <h2 className="font-serif text-lg font-bold">받을 알림</h2>
-        <p className="mt-1 text-sm text-soft">기후 알람에 넣을 내용을 골라요. 꺼도 앱 화면의 아이콘은 그대로 보여요.</p>
-        <form action={saveAlertPrefs} className="mt-3">
-          <div className="divide-y divide-line">
-            {ALERTS.map((a) => (
-              <label key={a.key} className="flex cursor-pointer items-center gap-3 py-3">
-                {a.key === "suggestion" ? (
-                  <span className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-[10px] bg-[#FBEAE4] text-sm">↻</span>
-                ) : (
-                  <AdviceBadge k={a.key === "outfit" ? "o5" : a.key} size={30} />
-                )}
-                <span className="min-w-0 flex-1">
-                  <b className="block text-[14.5px]">{a.title}</b>
-                  <span className="block text-xs text-muted">{a.sub}</span>
-                </span>
-                <input type="checkbox" name={a.key} defaultChecked={tester.alertPrefs[a.key]} className="peer sr-only" />
-                <span className="relative h-7 w-12 flex-none rounded-full bg-[#E4E4E4] transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-6 after:w-6 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:bg-navy peer-checked:after:translate-x-5" />
-              </label>
-            ))}
-          </div>
-          <div className="mt-2">
-            <SubmitButton className={btnSecondary}>알림 설정 저장</SubmitButton>
-          </div>
-        </form>
-      </section>
+      {/* what goes into the alerts — only meaningful while 알림 is on */}
+      {tester.notify.on && (
+        <section className={card}>
+          <h2 className="font-serif text-lg font-bold">받을 알림</h2>
+          <p className="mt-1 text-sm text-soft">알림에 넣을 내용을 골라요. 꺼도 앱 화면의 아이콘은 그대로 보여요.</p>
+          <form action={saveAlertPrefs} className="mt-3">
+            <div className="divide-y divide-line">
+              {ALERTS.map((a) => (
+                <label key={a.key} className="flex cursor-pointer items-center gap-3 py-3">
+                  {a.key === "suggestion" ? (
+                    <span className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-[10px] bg-sky text-sm text-blue">↻</span>
+                  ) : (
+                    <AdviceBadge k={a.key === "outfit" ? "o5" : a.key} size={30} />
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <b className="block text-[14.5px]">{a.title}</b>
+                    <span className="block text-xs text-muted">{a.sub}</span>
+                  </span>
+                  <input type="checkbox" name={a.key} defaultChecked={tester.alertPrefs[a.key]} className="peer sr-only" />
+                  <span className="relative h-7 w-12 flex-none rounded-full bg-[#E4E4E4] transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-6 after:w-6 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:bg-navy peer-checked:after:translate-x-5" />
+                </label>
+              ))}
+            </div>
+            <div className="mt-2">
+              <SubmitButton className={btnSecondary}>알림 설정 저장</SubmitButton>
+            </div>
+          </form>
+        </section>
+      )}
 
       <section id="places" className={card}>
         <h2 className="font-serif text-lg font-bold">즐겨찾기 장소</h2>

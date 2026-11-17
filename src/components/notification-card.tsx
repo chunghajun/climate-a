@@ -15,9 +15,9 @@ function urlBase64ToUint8Array(base64String: string) {
   return out;
 }
 
-// mode "home": only asks for permission (hidden once notifications are on).
-// mode "full": also shows that they are on and lets the tester turn them off.
-export default function NotificationCard({ mode }: { mode: "home" | "full" }) {
+// This device's push subscription: whether the browser can take pushes (env), whether it
+// already does (subscription; undefined while checking), and how to start or stop.
+export function usePush() {
   const env = useBrowserEnv();
   const [subscription, setSubscription] = useState<PushSubscription | null | undefined>(undefined);
   const [status, setStatus] = useState("");
@@ -36,6 +36,7 @@ export default function NotificationCard({ mode }: { mode: "home" | "full" }) {
       .catch((e) => setStatus(`서비스 워커 등록 실패: ${e}`));
   }, [env]);
 
+  // true once this device can receive pushes
   async function subscribe() {
     setBusy(true);
     setStatus("");
@@ -43,7 +44,7 @@ export default function NotificationCard({ mode }: { mode: "home" | "full" }) {
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
         setStatus("알림이 허용되지 않았어요. 폰 설정에서 알림을 켜 주세요.");
-        return;
+        return false;
       }
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({
@@ -53,8 +54,10 @@ export default function NotificationCard({ mode }: { mode: "home" | "full" }) {
       await saveSubscription(JSON.parse(JSON.stringify(sub)), navigator.userAgent);
       setSubscription(sub);
       setStatus("알림 받을 준비가 됐어요!");
+      return true;
     } catch (e) {
       setStatus(`알림 설정 실패: ${e}`);
+      return false;
     } finally {
       setBusy(false);
     }
@@ -68,6 +71,14 @@ export default function NotificationCard({ mode }: { mode: "home" | "full" }) {
     setStatus("알림을 껐어요.");
   }
 
+  return { env, subscription, status, busy, subscribe, unsubscribe };
+}
+
+// mode "home": only asks for permission (hidden once notifications are on).
+// mode "full": also shows that they are on and lets the tester turn them off.
+export default function NotificationCard({ mode }: { mode: "home" | "full" }) {
+  const { env, subscription, status, busy, subscribe, unsubscribe } = usePush();
+
   if (env === "loading" || (env === "ok" && subscription === undefined)) return null;
   if (mode === "home" && subscription) return null;
 
@@ -76,7 +87,7 @@ export default function NotificationCard({ mode }: { mode: "home" | "full" }) {
     return (
       <div className="mb-4 rounded-[14px] bg-gray px-4 py-3 text-[13px] text-[#5a5a5a]">
         <div className="flex items-center justify-between gap-3">
-          <span>알림을 켜면 기후 알람 시각에 가방을 알려 드려요.</span>
+          <span>알림을 켜면 그날 챙길 것을 미리 알려 드려요.</span>
           <button onClick={subscribe} disabled={busy} className="flex-none font-bold text-blue disabled:opacity-50">
             켜기
           </button>

@@ -5,7 +5,7 @@ import AlarmList from "./alarm-list";
 export default async function AlarmsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const tester = await requireTester();
   const sp = await searchParams;
-  const from = typeof sp.from === "string" && ["/", "/week", "/month", "/settings"].includes(sp.from) ? sp.from : "/";
+  const from = typeof sp.from === "string" && ["/", "/calendar", "/settings"].includes(sp.from) ? sp.from : "/";
   return (
     <main className="mx-auto w-full max-w-md flex-1 px-5 py-5">
       <AlarmList initial={tester.alarms} back={from} />

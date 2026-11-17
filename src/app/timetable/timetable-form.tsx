@@ -35,7 +35,7 @@ export default function TimetableForm({ places, from = "/" }: { places: Place[];
   const [notice, setNotice] = useState("");
   const [dated, setDated] = useState<DatedRow[] | null>(null);
   const [lastImage, setLastImage] = useState<string | null>(null);
-  const back = ["/", "/week", "/month"].includes(from) ? from : "/";
+  const back = ["/", "/calendar"].includes(from) ? from : "/";
 
   function update(i: number, patch: Partial<TimetableRow>) {
     setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));

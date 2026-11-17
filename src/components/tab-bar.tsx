@@ -7,7 +7,7 @@ import { TLink } from "./nav-transition";
 
 const TABS = [
   { href: "/", label: "오늘", match: (p: string) => p === "/" },
-  { href: "/week", label: "달력", match: (p: string) => p === "/week" || p === "/month" },
+  { href: "/calendar", label: "달력", match: (p: string) => p === "/calendar" },
   { href: "/settings", label: "설정", match: (p: string) => p === "/settings" },
 ];
 

@@ -1,6 +1,6 @@
 import { TLink } from "./nav-transition";
 
-const VIEWS = ["/", "/week", "/month", "/events", "/settings"];
+const VIEWS = ["/", "/calendar", "/events", "/settings"];
 
 export default function BackHeader({ href, title }: { href: string; title: string }) {
   return (

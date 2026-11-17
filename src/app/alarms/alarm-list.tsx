@@ -1,45 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { TLink } from "@/components/nav-transition";
+import Wheel from "@/components/wheel";
 import { daysLabel, nextOnce, type Alarm } from "@/lib/alarms";
 import { DOW } from "@/lib/time";
 import { saveAlarms } from "../actions/alarms";
 
-const ROW = 36; // wheel row height
 const SMOOTH = "cubic-bezier(.2,.8,.2,1)";
 const parts = (t: string) => {
   const [h, m] = t.split(":").map(Number);
   return { pm: h >= 12, h: h % 12 || 12, m };
 };
-
-// One wheel column of the time picker (scroll-snapped, like the phone's alarm).
-function Wheel({ items, index, onPick, wide }: { items: string[]; index: number; onPick: (i: number) => void; wide?: boolean }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  useEffect(() => {
-    if (ref.current) ref.current.scrollTop = index * ROW;
-    // only when the sheet opens
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  return (
-    <div
-      ref={ref}
-      onScroll={() => {
-        clearTimeout(timer.current);
-        timer.current = setTimeout(() => ref.current && onPick(Math.round(ref.current.scrollTop / ROW)), 80);
-      }}
-      className="relative z-[1] h-[216px] snap-y snap-mandatory overflow-y-scroll py-[90px] text-center [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      style={{ width: wide ? 76 : 64 }}
-    >
-      {items.map((x) => (
-        <div key={x} className={`h-9 snap-center leading-9 tabular-nums text-soft ${wide ? "text-lg" : "text-[22px]"}`}>
-          {x}
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export default function AlarmList({ initial, back }: { initial: Alarm[]; back: string }) {
   const [alarms, setAlarms] = useState(initial);
@@ -165,7 +137,7 @@ export default function AlarmList({ initial, back }: { initial: Alarm[]; back: s
               <Wheel items={["오전", "오후"]} index={pick.pm} onPick={(i) => setPick((x) => ({ ...x, pm: i }))} wide />
               <Wheel items={Array.from({ length: 12 }, (_, i) => String(i + 1))} index={pick.h} onPick={(i) => setPick((x) => ({ ...x, h: i }))} />
               <Wheel items={Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"))} index={pick.m} onPick={(i) => setPick((x) => ({ ...x, m: i }))} />
-              <div className="pointer-events-none absolute inset-0 z-[2] bg-[linear-gradient(var(--color-paper),rgba(248,246,241,0)_38%,rgba(248,246,241,0)_62%,var(--color-paper))]" />
+              <div className="pointer-events-none absolute inset-0 z-[2] bg-[linear-gradient(var(--color-paper),rgba(255,255,255,0)_38%,rgba(255,255,255,0)_62%,var(--color-paper))]" />
             </div>
             <div className="mx-4 mt-2.5 rounded-2xl border border-line bg-white px-3.5 py-3">
               <span className="text-[15px] font-semibold">반복</span>
