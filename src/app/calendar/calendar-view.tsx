@@ -88,6 +88,19 @@ function usePref(key: string, fallback: string) {
   return [value, set] as const;
 }
 
+function readPref(key: string) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function writePref(key: string, v: string) {
+  try {
+    localStorage.setItem(key, v);
+  } catch {}
+}
+
 const md = (d: string) => `${Number(d.slice(5, 7))}월 ${Number(d.slice(8))}일`;
 const overnight = (e: CalEvt) => !!e.start && !!e.end && e.end < e.start;
 
@@ -218,15 +231,43 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
     if (el) el.style.setProperty("--hpx", `${Math.max(34, Math.round((el.clientHeight - 80) / 13))}px`);
   }, []);
 
+  // ---- into and out of the 시간표 ----
+  const weekEl = (i: number) => sc.current?.querySelector<HTMLElement>(`[data-wi="${i}"]`) ?? null;
+  const hourScroll = useRef<number | null>(null); // the hours in view, carried from week to week
+  const pending = useRef<{ kind: "enter" | "leave"; i: number; from: number; target: number; done?: () => void; restore?: boolean } | null>(null);
+  // remember the 시간표 (which week, which hours) so reopening the app comes back to it
+  const hpx = () => parseFloat(sc.current?.style.getPropertyValue("--hpx") || "40");
+  const rememberWeek = (i: number) => writePref("cal-tt-week", weeks[i]?.[0].date ?? "");
+  const hourSave = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const rememberHours = (top: number) => {
+    clearTimeout(hourSave.current);
+    hourSave.current = setTimeout(() => writePref("cal-tt-hour", (top / hpx()).toFixed(2)), 250);
+  };
+
   // first paint: the remembered level, today's week a third of the way down
   useLayoutEffect(() => {
     const el = sc.current;
     if (!el) return;
     setHourHeight();
     fit();
-    const i = Math.max(0, Math.min(3, Number(savedLevel) || 0));
-    apply(levels.current[i]);
+    const stored = Number(readPref("cal-level") ?? savedLevel) || 0;
     const t = el.querySelector<HTMLElement>("[data-today]");
+    if (stored === 4) {
+      // the week left open, unless it is already over — then this week
+      const todayWeek = weeks.findIndex((w) => w.some((d) => d.date === today));
+      const keptWeek = weeks.findIndex((w) => w[0].date === readPref("cal-tt-week"));
+      const i = keptWeek >= todayWeek ? keptWeek : todayWeek;
+      if (i >= 0) {
+        const h = Number(readPref("cal-tt-hour"));
+        hourScroll.current = Number.isFinite(h) && h > 0 ? h * hpx() : null;
+        pending.current = { kind: "enter", i, from: 0, target: 0, restore: true };
+        ttRef.current = true;
+        apply(el.clientHeight);
+        requestAnimationFrame(() => setTtWeek(i));
+        return;
+      }
+    }
+    apply(levels.current[Math.max(0, Math.min(3, stored))]);
     if (t) el.scrollTop = (t.parentElement as HTMLElement).offsetTop - el.clientHeight / 3;
     updateTitle();
     // only on mount
@@ -257,10 +298,6 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
     setTimeout(() => setToast((t) => (t === msg ? "" : t)), 1600);
   };
 
-  // ---- into and out of the 시간표 ----
-  const weekEl = (i: number) => sc.current?.querySelector<HTMLElement>(`[data-wi="${i}"]`) ?? null;
-  const hourScroll = useRef<number | null>(null); // the hours in view, carried from week to week
-  const pending = useRef<{ kind: "enter" | "leave"; i: number; from: number; target: number; done?: () => void } | null>(null);
 
   // past 3/4: the week under the fingers jumps to fill the area — top line to the top, bottom line to the bottom
   const snapToTimetable = useCallback(
@@ -323,6 +360,8 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
     const el = sc.current;
     const p = pending.current;
     if (!el || !p) return;
+    // wait for the render that actually shows (or hides) the 시간표
+    if ((p.kind === "enter") !== (ttWeek !== null)) return;
     pending.current = null;
     const wk = weekEl(p.i);
     if (!wk) {
@@ -333,9 +372,16 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
       apply(el.clientHeight);
       el.scrollTop = wk.offsetTop;
       const gs = wk.querySelector<HTMLElement>(".cal-gs");
-      if (gs) gs.scrollTop = hourScroll.current ?? parseFloat(el.style.getPropertyValue("--hpx")) * 8;
+      const top = hourScroll.current ?? parseFloat(el.style.getPropertyValue("--hpx")) * 8;
+      // set again once the new week has been laid out (on a reopen the first set can land too early)
+      if (gs) {
+        gs.scrollTop = top;
+        requestAnimationFrame(() => requestAnimationFrame(() => (gs.scrollTop = top)));
+      }
       locked.current = false;
-      showToast("좌우로 밀면 지난주 · 다음 주");
+      setSavedLevel("4");
+      rememberWeek(p.i);
+      if (!p.restore) showToast("좌우로 밀면 지난주 · 다음 주");
       return;
     }
     // leave: keep the week's top where it is, then shrink it to the calendar level
@@ -520,8 +566,9 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
         );
       } else sliding.current = false;
       setTtWeek(i + dir);
+      writePref("cal-tt-week", weeks[i + dir]?.[0].date ?? "");
     }, 200);
-  }, []);
+  }, [weeks]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (ttRef.current && (e.key === "ArrowLeft" || e.key === "ArrowRight")) goWeek(e.key === "ArrowLeft" ? -1 : 1);
@@ -720,6 +767,7 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
                       shownEvents={shownEvents}
                       onDay={(date) => open({ kind: "day", date })}
                       nowMin={nowMin}
+                      onHours={rememberHours}
                     />
                   ) : (
                     wk.map((d) => {
@@ -845,6 +893,7 @@ function WeekTable({
   shownEvents,
   onDay,
   nowMin,
+  onHours,
 }: {
   wk: CalDay[];
   prev: CalDay | null;
@@ -853,6 +902,7 @@ function WeekTable({
   shownEvents: (d: CalDay) => CalEvt[];
   onDay: (date: string) => void;
   nowMin: number;
+  onHours: (top: number) => void;
 }) {
   const at = (min: number) => `calc(var(--hpx) * ${(min / 60).toFixed(4)})`;
   const untimed = wk.map((d) => shownEvents(d).filter((e) => !e.start));
@@ -914,7 +964,7 @@ function WeekTable({
           ))}
         </div>
       )}
-      <div className="cal-gs">
+      <div className="cal-gs" onScroll={(e) => onHours(e.currentTarget.scrollTop)}>
         <div className="cal-grid">
           {wk.map((d, i) => (
             <div key={d.date} className={`cal-tc ${d.date === today ? "today" : ""}`}>
