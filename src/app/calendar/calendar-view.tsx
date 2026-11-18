@@ -7,11 +7,13 @@
 // details (기온, 비, 강수량) and things to bring open in sheets.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { ADVICE_LABEL, isOutfit, skyLabel, type AdviceKey, type WeatherKind } from "@/lib/advice";
+import { ADVICE_LABEL, isOutfit, skyLabel } from "@/lib/advice";
 import { DOW, dowOf } from "@/lib/time";
 import { AdviceBadge } from "@/components/icons";
 import { TLink } from "@/components/nav-transition";
 import WxIcon, { wxKind } from "@/components/wx-icons";
+import { TempBar, tempRange } from "@/components/week-weather";
+import type { DayWeather } from "@/lib/day-weather";
 
 export type CalEvt = {
   id: string;
@@ -24,17 +26,6 @@ export type CalEvt = {
   pop: number | null;
 };
 export type CalDay = { date: string; events: CalEvt[] };
-export type CalWeather = {
-  kind: WeatherKind;
-  hi: number | null;
-  lo: number | null;
-  pop: number | null;
-  mm: number | null;
-  advice: AdviceKey[];
-  colder: boolean;
-  mid: boolean;
-};
-
 const LEVELS = [70, 100, 142, 210]; // 촘촘 · 막대 · 블록 · 주간 — 주간 grows to fit the busiest day
 const levelOf = (rh: number) => (rh < 85 ? 0 : rh < 121 ? 1 : rh < 176 ? 2 : 3);
 const LABEL_H = 28; // month label row
@@ -77,13 +68,13 @@ function usePref(key: string, fallback: string) {
 
 const md = (d: string) => `${Number(d.slice(5, 7))}월 ${Number(d.slice(8))}일`;
 
-export default function CalendarView({ days, weather, today, place }: { days: CalDay[]; weather: Record<string, CalWeather>; today: string; place: string }) {
+export default function CalendarView({ days, weather, today }: { days: CalDay[]; weather: Record<string, DayWeather>; today: string }) {
   const sc = useRef<HTMLDivElement>(null);
   const rh = useRef(LEVELS[0]);
   const levels = useRef([...LEVELS]);
   const anim = useRef(0);
   const [title, setTitle] = useState(today.slice(0, 7));
-  const [sheet, setSheet] = useState<{ kind: "day"; date: string } | { kind: "wx" } | null>(null);
+  const [sheet, setSheet] = useState<{ kind: "day"; date: string } | null>(null);
   const [shown, setShown] = useState(false);
   const [hideRepeat, setHideRepeat] = usePref("cal-hide-repeat", "0");
   const [savedLevel, setSavedLevel] = usePref("cal-level", "0");
@@ -332,14 +323,6 @@ export default function CalendarView({ days, weather, today, place }: { days: Ca
               {hideRepeat === "1" && <path d="M3 3l18 18" />}
             </svg>
           </button>
-          <button
-            type="button"
-            onClick={() => open({ kind: "wx" })}
-            className="ml-1 flex h-9 items-center gap-1 rounded-full bg-white px-3 text-[13px] font-bold text-ink shadow-[0_1px_2px_rgba(0,0,0,.06)]"
-          >
-            <WxIcon kind="partly" size={18} />
-            날씨
-          </button>
         </div>
       </header>
 
@@ -484,11 +467,13 @@ export default function CalendarView({ days, weather, today, place }: { days: Ca
               <div className="sticky top-0 -mx-5 bg-white px-5 pb-1 pt-2">
                 <div className="mx-auto h-[5px] w-9 rounded-full bg-[#DADADA]" />
               </div>
-              {sheet.kind === "day" ? (
-                <DaySheet day={days.find((d) => d.date === sheet.date)!} w={weather[sheet.date]} today={today} hideRepeat={hideRepeat === "1"} />
-              ) : (
-                <WeatherSheet weather={weather} today={today} place={place} />
-              )}
+              <DaySheet
+                day={days.find((d) => d.date === sheet.date)!}
+                w={weather[sheet.date]}
+                today={today}
+                hideRepeat={hideRepeat === "1"}
+                range={tempRange(weather)}
+              />
             </div>
           </>,
           document.body,
@@ -497,7 +482,19 @@ export default function CalendarView({ days, weather, today, place }: { days: Ca
   );
 }
 
-function DaySheet({ day, w, today, hideRepeat }: { day: CalDay; w: CalWeather | undefined; today: string; hideRepeat: boolean }) {
+function DaySheet({
+  day,
+  w,
+  today,
+  hideRepeat,
+  range,
+}: {
+  day: CalDay;
+  w: DayWeather | undefined;
+  today: string;
+  hideRepeat: boolean;
+  range: { min: number; max: number };
+}) {
   const d = day.date;
   const evs = hideRepeat ? day.events.filter((e) => !e.repeat) : day.events;
   return (
@@ -510,11 +507,22 @@ function DaySheet({ day, w, today, hideRepeat }: { day: CalDay; w: CalWeather | 
         <>
           <div className="mt-3 flex items-center gap-3">
             <WxIcon kind={wxKind(w.kind, w.mm)} size={46} />
-            <span className="text-[32px] font-extrabold leading-none tracking-[-.02em]">{w.hi ?? "-"}°</span>
-            <span className="text-[13px] leading-[1.5] text-[#6e6e6e]">
-              {skyLabel(w.kind)} · 최저 {w.lo ?? "-"}°
-              <br />비 {w.pop ?? 0}%{w.mm ? ` · ${w.mm}mm` : ""}
-              {w.mid && " · 대략적인 예보"}
+            <span className="min-w-0 flex-1">
+              <b className="block text-[15px]">{skyLabel(w.kind)}</b>
+              <span className="block text-[12.5px] text-[#6e6e6e]">
+                비 {w.pop ?? 0}%{w.mm ? ` · ${w.mm}mm` : ""}
+                {w.mid && " · 대략적인 예보"}
+              </span>
+            </span>
+          </div>
+          {/* 최저–최고 on the same scale as the other forecast days */}
+          <div className="mt-3 grid grid-cols-[auto_1fr_auto] items-center gap-2.5 rounded-[12px] bg-[#F4F5F7] px-3.5 py-3 text-[13px] tabular-nums">
+            <span className="text-[#8a8f99]">
+              최저 <b className="text-[15px] text-ink">{w.lo ?? "-"}°</b>
+            </span>
+            <TempBar lo={w.lo} hi={w.hi} min={range.min} max={range.max} />
+            <span className="text-[#8a8f99]">
+              최고 <b className="text-[15px] text-ink">{w.hi ?? "-"}°</b>
             </span>
           </div>
           <p className="mb-2 mt-4 text-[12.5px] font-bold text-muted">챙길 것</p>
@@ -576,49 +584,6 @@ function DaySheet({ day, w, today, hideRepeat }: { day: CalDay; w: CalWeather | 
       >
         + 이 날 일정 추가
       </TLink>
-    </div>
-  );
-}
-
-function WeatherSheet({ weather, today, place }: { weather: Record<string, CalWeather>; today: string; place: string }) {
-  const dates = Object.keys(weather).sort();
-  const temps = dates.flatMap((d) => [weather[d].lo, weather[d].hi]).filter((t): t is number => t != null);
-  const tMin = temps.length ? Math.min(...temps) : 0;
-  const tMax = temps.length ? Math.max(...temps) : 1;
-  const pct = (t: number) => ((t - tMin) / Math.max(1, tMax - tMin)) * 100;
-  return (
-    <div>
-      <h3 className="mt-2 text-[19px] font-extrabold">날씨 자세히</h3>
-      <p className="mb-2 mt-1 text-[12.5px] text-muted">{place ? `📍 ${place} · ` : ""}오늘부터 10일 · 4일 뒤부터는 중기예보라 대략적이에요</p>
-      {dates.length === 0 && <p className="py-3 text-[13px] text-muted">설정에서 장소를 저장하면 날씨가 보여요.</p>}
-      {dates.map((d) => {
-        const w = weather[d];
-        return (
-          <div
-            key={d}
-            className={`grid grid-cols-[52px_30px_38px_30px_1fr_30px_46px] items-center gap-1 py-1.5 text-[13px] tabular-nums ${w.mid ? "opacity-80" : ""}`}
-          >
-            <b className={d === today ? "text-blue" : ""}>{d === today ? "오늘" : `${Number(d.slice(8))}일 ${DOW[dowOf(d)]}`}</b>
-            <WxIcon kind={wxKind(w.kind, w.mm)} size={26} />
-            <span className={`text-right text-[12px] font-bold ${(w.pop ?? 0) >= 30 ? "text-blue" : "text-muted"}`}>{w.pop ?? 0}%</span>
-            <span className="text-right text-[#8a8f99]">{w.lo ?? "-"}°</span>
-            <span className="relative h-[5px] rounded-full bg-[#EEF0F3]">
-              {w.lo != null && w.hi != null && (
-                <i
-                  className="absolute inset-y-0 rounded-full bg-[linear-gradient(90deg,#7FB2FF,#FFB15E)]"
-                  style={{
-                    left: `${pct(w.lo)}%`,
-                    right: `${100 - pct(w.hi)}%`,
-                  }}
-                />
-              )}
-            </span>
-            <span>{w.hi ?? "-"}°</span>
-            <span className="text-right text-[11.5px] text-muted">{w.mm ? `${w.mm}mm` : ""}</span>
-          </div>
-        );
-      })}
-      <p className="mt-2 text-[12px] text-muted">% 비 올 확률 · mm 예상 강수량 (3일 뒤까지)</p>
     </div>
   );
 }

@@ -4,7 +4,8 @@ import { weatherDays } from "@/lib/plan";
 import { addDays, kstNow, sundayOf, toMinutes } from "@/lib/time";
 import AutoRefresh from "@/components/auto-refresh";
 import Fab from "@/components/fab";
-import CalendarView, { type CalDay, type CalWeather } from "./calendar-view";
+import { dayWeather } from "@/lib/day-weather";
+import CalendarView, { type CalDay } from "./calendar-view";
 
 // How far the KMA forecast reaches (단기예보 to 3일 뒤, 중기예보 to 10일 뒤).
 const FORECAST_DAYS = 10;
@@ -52,19 +53,11 @@ export default async function CalendarPage() {
     });
   }
 
-  const weather: Record<string, CalWeather> = {};
-  for (let d = today; d <= last; d = addDays(d, 1)) {
-    const s = summaries.get(d);
-    if (!s?.kind) continue;
-    // 예상 강수량: the day's hourly amounts, where the short-range forecast has them
-    const mm = short[d] ? Math.round(Object.values(short[d].h).reduce((t, h) => t + (h.pcp ?? 0), 0)) : null;
-    const round = (t: number | null) => (t == null ? null : Math.round(t));
-    weather[d] = { kind: s.kind, hi: round(s.hi), lo: round(s.lo), pop: s.pop, mm, advice: s.advice, colder: s.colder, mid: s.source === "mid" };
-  }
+  const weather = dayWeather(summaries, short, today, last);
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col bg-[#F4F5F7]">
-      <CalendarView days={days} weather={weather} today={today} place={places[0]?.label ?? ""} />
+      <CalendarView days={days} weather={weather} today={today} />
       <Fab date={today} />
       <AutoRefresh />
     </main>

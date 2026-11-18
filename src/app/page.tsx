@@ -7,6 +7,7 @@ import { eventsOn } from "@/lib/events";
 import { todayBag } from "@/lib/outing";
 import { planDays, suggestionsFor, weatherDays, type PlannedOuting } from "@/lib/plan";
 import { openSuggestions } from "@/lib/suggestion-log";
+import { dayWeather } from "@/lib/day-weather";
 import { addDays, DOW, dowOf, kstNow, toMinutes } from "@/lib/time";
 import type { CalEvent } from "@/lib/types";
 import AutoRefresh from "@/components/auto-refresh";
@@ -48,7 +49,7 @@ export default async function Home() {
   const todayEvents = eventsOn(events, today);
   const [planned, wx] = await Promise.all([
     places.length && events.length ? planDays(events, places, [today, tomorrow]) : new Map<string, PlannedOuting[]>(),
-    weatherDays(places, today, tomorrow),
+    weatherDays(places, today, addDays(today, 6)),
   ]);
   const todayPlanned = planned.get(today) ?? [];
   const summary = wx.summaries.get(today);
@@ -92,6 +93,8 @@ export default async function Home() {
             todayEvents={todayEvents}
             tomorrowEvents={eventsOn(events, tomorrow)}
             bag={bag}
+            week={dayWeather(wx.summaries, wx.short, today, addDays(today, 6))}
+            todayDate={today}
           />
         </div>
       )}

@@ -7,6 +7,8 @@ import { toMinutes } from "@/lib/time";
 import type { CalEvent } from "@/lib/types";
 import { AdviceBadge, Legend, WeatherIcon } from "@/components/icons";
 import Sheet from "@/components/sheet";
+import WeekWeather from "@/components/week-weather";
+import type { DayWeather } from "@/lib/day-weather";
 
 const hh = (h: number) => String(h).padStart(2, "0");
 const tempOf = (w?: HourWx) => {
@@ -24,6 +26,8 @@ type Props = {
   todayEvents: CalEvent[];
   tomorrowEvents: CalEvent[];
   bag: BagItem[];
+  week: Record<string, DayWeather>; // today … 6 days ahead
+  todayDate: string;
 };
 
 export default function TodayWeather(p: Props) {
@@ -81,8 +85,8 @@ export default function TodayWeather(p: Props) {
           <div className="min-w-0 text-[12.5px] leading-[1.5] text-[#6e6e6e]">
             <p className="truncate">{headline}</p>
             <p>
-              {p.summary?.hi != null && <b className="text-ink">최고 {p.summary.hi}°</b>}
-              {p.summary?.lo != null && <b className="text-ink"> · 최저 {p.summary.lo}°</b>}
+              {p.summary?.hi != null && <b className="text-ink">최고 {Math.round(p.summary.hi)}°</b>}
+              {p.summary?.lo != null && <b className="text-ink"> · 최저 {Math.round(p.summary.lo)}°</b>}
               {rainPop !== null && <span className="font-bold text-blue"> · 비 {rainPop}%</span>} · {diffText}
             </p>
           </div>
@@ -128,7 +132,10 @@ export default function TodayWeather(p: Props) {
         </div>
 
         {/* More hours; the bag has its own card above. */}
-        <div className="mt-2.5 flex justify-end text-ink">
+        <div className="mt-2.5 flex justify-end gap-2 text-ink">
+        <Sheet label="이번 주 날씨 ›" title="이번 주 날씨" subtitle={`📍 ${p.placeLabel} · 오늘부터 7일`}>
+          <WeekWeather weather={p.week} today={p.todayDate} />
+        </Sheet>
         <Sheet label="시간별 더 보기 ›" title="오늘 날씨" subtitle={`📍 ${p.placeLabel}`}>
           <div className="flex items-center justify-between rounded-[22px] bg-navy px-5 py-4 text-white">
             <div>
@@ -136,8 +143,8 @@ export default function TodayWeather(p: Props) {
               <p className="mt-0.5 font-serif text-5xl font-bold leading-none">{nowTemp ?? "-"}°</p>
               <p className="mt-1.5 text-[13.5px] font-bold">{skyLabel(kind)}</p>
               <p className="mt-1 text-[12.5px] font-bold text-[#C9D0DE]">
-                {p.summary?.hi != null && <span className="text-[#F2A08F]">↑{p.summary.hi}°</span>}{" "}
-                {p.summary?.lo != null && <span className="text-[#A9C1E6]">↓{p.summary.lo}°</span>} · {diffText}
+                {p.summary?.hi != null && <span className="text-[#F2A08F]">↑{Math.round(p.summary.hi)}°</span>}{" "}
+                {p.summary?.lo != null && <span className="text-[#A9C1E6]">↓{Math.round(p.summary.lo)}°</span>} · {diffText}
               </p>
             </div>
             <span className="rounded-[22px] bg-paper p-2">
