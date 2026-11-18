@@ -1,14 +1,16 @@
 "use client";
 
 // 달력 (iPhone-calendar style): one continuous calendar that you stretch from a month overview
-// into a week view — dots → bars → titled blocks → blocks with time and place. Pinch with two
-// fingers (or drag the weekday bar, or Ctrl + wheel); on release it settles on the nearest level,
-// and the touched week stays where it is. The forecast days carry a weather icon under the date;
-// details (기온, 비, 강수량) and things to bring open in sheets.
+// into a week view — dots → bars → titled blocks → blocks with times. Pinch with two fingers
+// (or drag the weekday bar, or Ctrl + wheel); on release it settles on the nearest level, and the
+// touched week stays where it is. Stretch a week past 3/4 of the screen and it snaps to fill it as
+// a 시간표: 0–24시 at the same hour height every week, scrolled inside, swiped sideways from week
+// to week; pinching in brings the calendar back. Forecast days carry a weather icon under the
+// date; tapping a day opens its weather, things to bring and plans.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { ADVICE_LABEL, isOutfit, skyLabel } from "@/lib/advice";
-import { DOW, dowOf } from "@/lib/time";
+import { DOW, dowOf, toMinutes } from "@/lib/time";
 import { AdviceBadge } from "@/components/icons";
 import { TLink } from "@/components/nav-transition";
 import WxIcon, { wxKind } from "@/components/wx-icons";
@@ -29,9 +31,26 @@ export type CalDay = { date: string; events: CalEvt[] };
 const LEVELS = [70, 100, 142, 210]; // 촘촘 · 막대 · 블록 · 주간 — 주간 grows to fit the busiest day
 const levelOf = (rh: number) => (rh < 85 ? 0 : rh < 121 ? 1 : rh < 176 ? 2 : 3);
 const LABEL_H = 28; // month label row
+const SNAP = 0.75; // a week taller than this share of the screen becomes the 시간표
 const SMOOTH = "cubic-bezier(.2,.8,.2,1)";
-// 매주 수업 blue, 한 번 일정 green, 시간 미정 amber
-const colorOf = (e: CalEvt) => (!e.start ? "#E0912F" : e.repeat ? "#3A6FD8" : "#22A06B");
+const ease = (k: number) => 1 - Math.pow(1 - k, 3);
+
+// one soft colour per title, like a timetable app (the same everywhere: dots, blocks, 시간표, list)
+const PALETTE = [
+  ["#E3ECFF", "#2F5BB8"],
+  ["#E2F5EC", "#1F7A52"],
+  ["#F1E8FF", "#6B46C1"],
+  ["#FFF0DC", "#A85F0A"],
+  ["#FDE6EC", "#B0365A"],
+  ["#E0F4F7", "#17707D"],
+  ["#EDEFF3", "#4B5563"],
+];
+function colorOf(title: string) {
+  let h = 0;
+  for (const c of title) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  const [bg, fg] = PALETTE[h % PALETTE.length];
+  return { bg, fg };
+}
 
 // small localStorage-backed preference, read without a setState-in-effect
 function usePref(key: string, fallback: string) {
@@ -57,19 +76,24 @@ function usePref(key: string, fallback: string) {
     },
     () => fallback,
   );
-  const set = (v: string) => {
-    try {
-      localStorage.setItem(key, v);
-    } catch {}
-    window.dispatchEvent(new Event(`pref:${key}`));
-  };
+  const set = useCallback(
+    (v: string) => {
+      try {
+        localStorage.setItem(key, v);
+      } catch {}
+      window.dispatchEvent(new Event(`pref:${key}`));
+    },
+    [key],
+  );
   return [value, set] as const;
 }
 
 const md = (d: string) => `${Number(d.slice(5, 7))}월 ${Number(d.slice(8))}일`;
+const overnight = (e: CalEvt) => !!e.start && !!e.end && e.end < e.start;
 
 export default function CalendarView({ days, weather, today }: { days: CalDay[]; weather: Record<string, DayWeather>; today: string }) {
   const sc = useRef<HTMLDivElement>(null);
+  const hint = useRef<HTMLDivElement>(null);
   const rh = useRef(LEVELS[0]);
   const levels = useRef([...LEVELS]);
   const anim = useRef(0);
@@ -78,26 +102,48 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
   const [shown, setShown] = useState(false);
   const [hideRepeat, setHideRepeat] = usePref("cal-hide-repeat", "0");
   const [savedLevel, setSavedLevel] = usePref("cal-level", "0");
+  // 시간표 mode: which week fills the screen (null = the calendar)
+  const [ttWeek, setTtWeek] = useState<number | null>(null);
+  const tt = ttWeek !== null;
+  const ttRef = useRef(false);
+  const [toast, setToast] = useState("");
+  const swipe = useRef<{ x: number; y: number; dx: number; on: boolean; id: number; t: number } | null>(null);
+  const suppressClick = useRef(false);
+  // now (KST minutes) for the red line in the 시간표; set once when the page opens
+  const [nowMin] = useState(() => {
+    const k = new Date(Date.now() + 9 * 3600e3);
+    return k.getUTCHours() * 60 + k.getUTCMinutes();
+  });
 
   const weeks = useMemo(() => {
     const out: CalDay[][] = [];
     for (let i = 0; i < days.length; i += 7) out.push(days.slice(i, i + 7));
     return out;
   }, [days]);
-  const shownEvents = (d: CalDay) => (hideRepeat === "1" ? d.events.filter((e) => !e.repeat) : d.events);
+  const shownEvents = useCallback((d: CalDay) => (hideRepeat === "1" ? d.events.filter((e) => !e.repeat) : d.events), [hideRepeat]);
 
   // ---- zoom: everything below works on the DOM directly so a pinch never re-renders React ----
+  const gestureOn = useRef(false); // a finger, mouse or wheel gesture is in progress
+  const locked = useRef(false); // an animation owns the calendar
+  const hold = useRef(false); // this gesture already snapped one way; it ends without doing more
+
   const apply = useCallback((h: number) => {
     const el = sc.current;
     if (!el) return;
     rh.current = h;
     el.style.setProperty("--rh", `${h}px`);
     el.dataset.lv = String(levelOf(h));
+    // between 주간 and the snap, a small bar shows how much further to pull
+    const p = (h - levels.current[3]) / (Math.round(el.clientHeight * SNAP) - levels.current[3]);
+    const on = !ttRef.current && gestureOn.current && p > 0.08;
+    hint.current?.classList.toggle("opacity-100", on);
+    hint.current?.classList.toggle("opacity-0", !on);
+    hint.current?.style.setProperty("--p", `${Math.max(0, Math.min(1, p)) * 100}%`);
   }, []);
 
   const updateTitle = useCallback(() => {
     const el = sc.current;
-    if (!el) return;
+    if (!el || ttRef.current) return;
     // the month of the week a third of the way down, where today's week sits when opened
     const y = el.scrollTop + el.clientHeight / 3;
     let m = "";
@@ -112,8 +158,7 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
     (h: number, anchor: number) => {
       const el = sc.current;
       if (!el) return;
-      const lv = levels.current;
-      h = Math.max(lv[0] - 10, Math.min(lv[3] + 50, h));
+      h = Math.max(levels.current[0] - 10, Math.min(Math.round(el.clientHeight * SNAP) + 2, h));
       const y = el.scrollTop + anchor;
       const labels = [...el.querySelectorAll<HTMLElement>("[data-month]")].filter((l) => l.offsetTop < y).length * LABEL_H;
       const rows = (y - labels) / rh.current;
@@ -129,7 +174,7 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
     if (!el || !t) return 0;
     const r = t.getBoundingClientRect();
     const s = el.getBoundingClientRect();
-    return Math.max(0, Math.min(s.height, r.top - s.top + rh.current / 2));
+    return Math.max(0, Math.min(s.height, r.top - s.top + Math.min(rh.current, 60) / 2));
   }, []);
 
   const settle = useCallback(
@@ -140,8 +185,8 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
       const from = rh.current;
       const t0 = performance.now();
       const step = (t: number) => {
-        const k = Math.min(1, (t - t0) / 360);
-        zoomTo(from + (to - from) * (1 - Math.pow(1 - k, 3)), anchor);
+        const k = Math.min(1, (t - t0) / 340);
+        zoomTo(from + (to - from) * ease(k), anchor);
         if (k < 1) anim.current = requestAnimationFrame(step);
         else {
           updateTitle();
@@ -153,10 +198,10 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
     [zoomTo, updateTitle, setSavedLevel],
   );
 
-  // the 주간 level is as tall as the busiest day needs, so no plan is ever cut off
+  // the 주간 level is as tall as the busiest day needs (but stays clear of the 시간표 snap)
   const fit = useCallback(() => {
     const el = sc.current;
-    if (!el) return;
+    if (!el || ttRef.current) return;
     const keepLv = el.dataset.lv;
     el.dataset.lv = "3";
     el.querySelectorAll<HTMLElement>(".cal-wk").forEach((w) => (w.style.height = "auto"));
@@ -164,13 +209,20 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
     el.querySelectorAll<HTMLElement>(".cal-c").forEach((c) => (need = Math.max(need, c.scrollHeight)));
     el.querySelectorAll<HTMLElement>(".cal-wk").forEach((w) => (w.style.height = ""));
     el.dataset.lv = keepLv;
-    levels.current[3] = Math.max(LEVELS[3], need + 10);
+    levels.current[3] = Math.max(170, Math.min(need + 10, Math.round(el.clientHeight * SNAP) - 40));
+  }, []);
+
+  // about 13 hours of the 시간표 fit on screen, the same in every week
+  const setHourHeight = useCallback(() => {
+    const el = sc.current;
+    if (el) el.style.setProperty("--hpx", `${Math.max(34, Math.round((el.clientHeight - 80) / 13))}px`);
   }, []);
 
   // first paint: the remembered level, today's week a third of the way down
   useLayoutEffect(() => {
     const el = sc.current;
     if (!el) return;
+    setHourHeight();
     fit();
     const i = Math.max(0, Math.min(3, Number(savedLevel) || 0));
     apply(levels.current[i]);
@@ -182,11 +234,179 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
   }, []);
   // hiding 반복 일정 changes how tall the busiest day is
   useLayoutEffect(() => {
+    if (ttRef.current) return;
     fit();
     if (rh.current > levels.current[3] || levelOf(rh.current) === 3) apply(levels.current[3]);
   }, [hideRepeat, fit, apply]);
+  useEffect(() => {
+    const onResize = () => {
+      setHourHeight();
+      const el = sc.current;
+      if (el && ttRef.current) {
+        const i = Math.round(el.scrollTop / rh.current);
+        apply(el.clientHeight);
+        el.scrollTop = i * el.clientHeight;
+      }
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [apply, setHourHeight]);
 
-  // pinch (two fingers) and Ctrl + wheel / trackpad pinch on the calendar
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast((t) => (t === msg ? "" : t)), 1600);
+  };
+
+  // ---- into and out of the 시간표 ----
+  const weekEl = (i: number) => sc.current?.querySelector<HTMLElement>(`[data-wi="${i}"]`) ?? null;
+  const hourScroll = useRef<number | null>(null); // the hours in view, carried from week to week
+  const pending = useRef<{ kind: "enter" | "leave"; i: number; from: number; target: number; done?: () => void } | null>(null);
+
+  // past 3/4: the week under the fingers jumps to fill the area — top line to the top, bottom line to the bottom
+  const snapToTimetable = useCallback(
+    (anchor: number) => {
+      const el = sc.current;
+      if (!el) return;
+      locked.current = true;
+      hold.current = gestureOn.current;
+      cancelAnimationFrame(anim.current);
+      const y = el.scrollTop + anchor;
+      const wk = [...el.querySelectorAll<HTMLElement>(".cal-wk")].find((w) => w.offsetTop + w.offsetHeight > y) ?? el.querySelector<HTMLElement>(".cal-wk");
+      if (!wk) return;
+      wk.classList.add("snapping");
+      navigator.vibrate?.(8);
+      const i = Number(wk.dataset.wi);
+      const startH = rh.current;
+      const startY = wk.offsetTop - el.scrollTop;
+      const t0 = performance.now();
+      const step = (t: number) => {
+        const k = Math.min(1, (t - t0) / 200);
+        apply(startH + (el.clientHeight - startH) * ease(k));
+        el.scrollTop = wk.offsetTop - startY * (1 - ease(k));
+        if (k < 1) {
+          anim.current = requestAnimationFrame(step);
+          return;
+        }
+        wk.classList.remove("snapping");
+        pending.current = { kind: "enter", i, from: 0, target: 0 };
+        ttRef.current = true;
+        setTtWeek(i);
+      };
+      anim.current = requestAnimationFrame(step);
+    },
+    [apply],
+  );
+
+  // the way back mirrors the way in: the 시간표 fades, the week eases down to 주간 size while the
+  // weeks around it and the month labels come back, then its plans fade in
+  const leaveTimetable = useCallback((target: number, done?: () => void) => {
+    const el = sc.current;
+    if (!el || !ttRef.current) return;
+    locked.current = true;
+    hold.current = gestureOn.current;
+    cancelAnimationFrame(anim.current);
+    const i = Math.round(el.scrollTop / rh.current);
+    const wk = weekEl(i);
+    const gs = wk?.querySelector<HTMLElement>(".cal-gs");
+    if (gs) hourScroll.current = gs.scrollTop;
+    wk?.querySelector(".cal-tt")?.classList.add("leaving");
+    const from = rh.current;
+    setTimeout(() => {
+      pending.current = { kind: "leave", i, from, target, done };
+      ttRef.current = false;
+      setTtWeek(null);
+    }, 110);
+  }, []);
+
+  // after React has swapped the week's contents, finish the move with the new layout
+  useLayoutEffect(() => {
+    const el = sc.current;
+    const p = pending.current;
+    if (!el || !p) return;
+    pending.current = null;
+    const wk = weekEl(p.i);
+    if (!wk) {
+      locked.current = false;
+      return;
+    }
+    if (p.kind === "enter") {
+      apply(el.clientHeight);
+      el.scrollTop = wk.offsetTop;
+      const gs = wk.querySelector<HTMLElement>(".cal-gs");
+      if (gs) gs.scrollTop = hourScroll.current ?? parseFloat(el.style.getPropertyValue("--hpx")) * 8;
+      locked.current = false;
+      showToast("좌우로 밀면 지난주 · 다음 주");
+      return;
+    }
+    // leave: keep the week's top where it is, then shrink it to the calendar level
+    wk.classList.add("snapping");
+    apply(p.from);
+    el.scrollTop = wk.offsetTop;
+    const endY = Math.max(0, Math.min(el.clientHeight * 0.28, el.clientHeight - p.target - 20));
+    const t0 = performance.now();
+    const step = (t: number) => {
+      const k = Math.min(1, (t - t0) / 300);
+      apply(p.from + (p.target - p.from) * ease(k));
+      el.scrollTop = wk.offsetTop - endY * ease(k);
+      updateTitle();
+      if (k < 1) {
+        anim.current = requestAnimationFrame(step);
+        return;
+      }
+      wk.classList.remove("snapping");
+      locked.current = false;
+      setSavedLevel(String(levels.current.indexOf(p.target)));
+      p.done?.();
+    };
+    anim.current = requestAnimationFrame(step);
+    // runs when the week shown changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ttWeek === null]);
+
+  // one gesture step (pinch, weekday-bar drag or Ctrl + wheel)
+  const gesture = useCallback(
+    (h: number, anchor: number) => {
+      const el = sc.current;
+      if (!el || locked.current || hold.current) return;
+      if (ttRef.current) {
+        // a little pinch-in squeezes the 시간표; past 86% it hands back to the calendar
+        const wk = weekEl(Math.round(el.scrollTop / rh.current));
+        if (h >= el.clientHeight) return apply(el.clientHeight);
+        if (h > el.clientHeight * 0.86) {
+          apply(h);
+          if (wk) el.scrollTop = wk.offsetTop;
+          return;
+        }
+        return leaveTimetable(levels.current[3]);
+      }
+      if (h >= Math.round(el.clientHeight * SNAP)) return snapToTimetable(anchor);
+      zoomTo(h, anchor);
+    },
+    [apply, leaveTimetable, snapToTimetable, zoomTo],
+  );
+  const gestureEnd = useCallback(
+    (anchor: number) => {
+      const el = sc.current;
+      gestureOn.current = false;
+      const held = hold.current;
+      hold.current = false;
+      apply(rh.current); // hides the pull hint
+      if (!el || locked.current || held) return;
+      if (ttRef.current) {
+        // let go after a small squeeze: spring back to the full week
+        if (rh.current < el.clientHeight) {
+          const wk = weekEl(Math.round(el.scrollTop / rh.current));
+          apply(el.clientHeight);
+          if (wk) el.scrollTop = wk.offsetTop;
+        }
+        return;
+      }
+      settle(null, anchor);
+    },
+    [apply, settle],
+  );
+
+  // pinch (two fingers) and Ctrl + wheel / trackpad pinch
   useEffect(() => {
     const el = sc.current;
     if (!el) return;
@@ -195,24 +415,22 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
     const onStart = (e: TouchEvent) => {
       if (e.touches.length !== 2) return;
       cancelAnimationFrame(anim.current);
+      gestureOn.current = true;
+      swipe.current = null;
       const top = el.getBoundingClientRect().top;
-      pinch = {
-        dist: spread(e.touches),
-        rh: rh.current,
-        anchor: (e.touches[0].clientY + e.touches[1].clientY) / 2 - top,
-      };
+      pinch = { dist: spread(e.touches), rh: rh.current, anchor: ttRef.current ? 0 : (e.touches[0].clientY + e.touches[1].clientY) / 2 - top };
       e.preventDefault();
     };
     const onMove = (e: TouchEvent) => {
       if (!pinch || e.touches.length !== 2) return;
       e.preventDefault();
-      zoomTo(pinch.rh * (spread(e.touches) / pinch.dist), pinch.anchor);
+      gesture(pinch.rh * (spread(e.touches) / pinch.dist), pinch.anchor);
     };
     const onEnd = (e: TouchEvent) => {
       if (pinch && e.touches.length < 2) {
         const a = pinch.anchor;
         pinch = null;
-        settle(null, a);
+        gestureEnd(a);
       }
     };
     let wheelT: ReturnType<typeof setTimeout>;
@@ -220,10 +438,11 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
       if (!e.ctrlKey) return;
       e.preventDefault();
       cancelAnimationFrame(anim.current);
-      const a = e.clientY - el.getBoundingClientRect().top;
-      zoomTo(rh.current * Math.exp(-e.deltaY / 120), a);
+      gestureOn.current = true;
+      const a = ttRef.current ? 0 : e.clientY - el.getBoundingClientRect().top;
+      gesture(rh.current * Math.exp(-e.deltaY / 120), a);
       clearTimeout(wheelT);
-      wheelT = setTimeout(() => settle(null, a), 160);
+      wheelT = setTimeout(() => gestureEnd(a), 170);
     };
     const noPageZoom = (e: Event) => e.preventDefault(); // iOS Safari's own pinch-to-zoom
     el.addEventListener("touchstart", onStart, { passive: false });
@@ -241,28 +460,122 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
       el.removeEventListener("gesturestart", noPageZoom);
       clearTimeout(wheelT);
     };
-  }, [zoomTo, settle]);
+  }, [gesture, gestureEnd]);
 
   // one finger: drag the weekday bar down to stretch, up to shrink
   const drag = useRef<{ y: number; rh: number; anchor: number } | null>(null);
   const onBarDown = (e: React.PointerEvent) => {
     cancelAnimationFrame(anim.current);
-    drag.current = { y: e.clientY, rh: rh.current, anchor: todayAnchor() };
+    gestureOn.current = true;
+    drag.current = { y: e.clientY, rh: rh.current, anchor: ttRef.current ? 0 : todayAnchor() };
     e.currentTarget.setPointerCapture(e.pointerId);
   };
   const onBarMove = (e: React.PointerEvent) => {
-    if (drag.current) zoomTo(drag.current.rh * Math.exp((e.clientY - drag.current.y) / 210), drag.current.anchor);
+    if (drag.current) gesture(drag.current.rh * Math.exp((e.clientY - drag.current.y) / 210), drag.current.anchor);
   };
   const onBarUp = () => {
     if (!drag.current) return;
     const a = drag.current.anchor;
     drag.current = null;
-    settle(null, a);
+    gestureEnd(a);
   };
+
+  // 시간표: slide to the week before or after, keeping the hours in view
+  const sliding = useRef(false);
+  const goWeek = useCallback((dir: number) => {
+    const el = sc.current;
+    if (!el || !ttRef.current || sliding.current || locked.current) return;
+    const i = Math.round(el.scrollTop / rh.current);
+    const cur = weekEl(i)?.querySelector<HTMLElement>(".cal-tt");
+    const next = weekEl(i + dir);
+    if (!cur) return;
+    if (!next) {
+      cur.classList.add("slide");
+      cur.style.transform = "";
+      return;
+    }
+    sliding.current = true;
+    hourScroll.current = weekEl(i)?.querySelector<HTMLElement>(".cal-gs")?.scrollTop ?? hourScroll.current;
+    const w = el.clientWidth;
+    cur.classList.add("slide");
+    cur.style.transform = `translateX(${-dir * w}px)`;
+    setTimeout(() => {
+      cur.classList.remove("slide");
+      cur.style.transform = "";
+      el.scrollTop = next.offsetTop;
+      const gs = next.querySelector<HTMLElement>(".cal-gs");
+      if (gs && hourScroll.current !== null) gs.scrollTop = hourScroll.current;
+      const tt2 = next.querySelector<HTMLElement>(".cal-tt");
+      if (tt2) {
+        tt2.style.transform = `translateX(${dir * w}px)`;
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            tt2.classList.add("slide");
+            tt2.style.transform = "";
+            setTimeout(() => {
+              tt2.classList.remove("slide");
+              sliding.current = false;
+            }, 270);
+          }),
+        );
+      } else sliding.current = false;
+      setTtWeek(i + dir);
+    }, 200);
+  }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (ttRef.current && (e.key === "ArrowLeft" || e.key === "ArrowRight")) goWeek(e.key === "ArrowLeft" ? -1 : 1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [goWeek]);
+
+  // one finger sideways on the 시간표 drags the week; up and down scrolls the hours
+  const onScPointerDown = (e: React.PointerEvent) => {
+    if (!ttRef.current || sliding.current || locked.current || !e.isPrimary) return;
+    swipe.current = { x: e.clientX, y: e.clientY, dx: 0, on: false, id: e.pointerId, t: performance.now() };
+  };
+  const onScPointerMove = (e: React.PointerEvent) => {
+    const s = swipe.current;
+    const el = sc.current;
+    if (!s || !el || e.pointerId !== s.id) return;
+    const dx = e.clientX - s.x;
+    const dy = e.clientY - s.y;
+    if (!s.on) {
+      if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy)) return;
+      s.on = true;
+      try {
+        el.setPointerCapture(e.pointerId);
+      } catch {}
+    }
+    s.dx = dx;
+    const cur = weekEl(Math.round(el.scrollTop / rh.current))?.querySelector<HTMLElement>(".cal-tt");
+    if (cur) cur.style.transform = `translateX(${dx}px)`;
+  };
+  const onScPointerUp = () => {
+    const s = swipe.current;
+    const el = sc.current;
+    swipe.current = null;
+    if (!s?.on || !el) return;
+    suppressClick.current = true;
+    setTimeout(() => (suppressClick.current = false), 60);
+    const fast = Math.abs(s.dx) / (performance.now() - s.t) > 0.5;
+    if (Math.abs(s.dx) > el.clientWidth * 0.22 || (fast && Math.abs(s.dx) > 30)) return goWeek(s.dx < 0 ? 1 : -1);
+    const cur = weekEl(Math.round(el.scrollTop / rh.current))?.querySelector<HTMLElement>(".cal-tt");
+    if (cur) {
+      cur.classList.add("slide");
+      cur.style.transform = "";
+      setTimeout(() => cur.classList.remove("slide"), 270);
+    }
+  };
+
   const nextLevel = () => {
+    if (locked.current) return;
+    if (ttRef.current) return leaveTimetable(levels.current[0] === rh.current ? levels.current[3] : levels.current[0]);
     const lv = levels.current;
     const i = lv.indexOf(lv.reduce((a, b) => (Math.abs(b - rh.current) < Math.abs(a - rh.current) ? b : a)));
-    settle(lv[(i + 1) % lv.length], todayAnchor());
+    if (i === lv.length - 1) return snapToTimetable(todayAnchor());
+    settle(lv[i + 1], todayAnchor());
   };
   const goToday = () => {
     const el = sc.current;
@@ -276,6 +589,7 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
 
   // ---- sheets ----
   const open = (s: NonNullable<typeof sheet>) => {
+    if (suppressClick.current) return;
     setSheet(s);
     requestAnimationFrame(() => requestAnimationFrame(() => setShown(true)));
   };
@@ -293,15 +607,30 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
   const [y, m] = title.split("-").map(Number);
   const todayWx = weather[today];
   const iconBtn = "flex h-9 w-9 items-center justify-center rounded-full text-[#5b606a] active:bg-black/5";
+  const ttDays = tt ? weeks[ttWeek] : null;
 
   return (
     <div className="flex h-[calc(100dvh-60px-env(safe-area-inset-bottom))] flex-col">
       <header className="flex flex-none items-end justify-between px-5 pb-2.5 pt-6">
-        <h1 className="text-[26px] font-extrabold leading-none tracking-[-.02em]">
-          {m}월<span className="ml-1.5 text-[14px] font-semibold text-muted">{y}</span>
-        </h1>
-        <div className="flex items-center gap-0.5">
-          <button type="button" onClick={nextLevel} className={iconBtn} aria-label="달력 크기 바꾸기">
+        {ttDays ? (
+          <div className="flex min-w-0 items-center gap-0.5">
+            <button type="button" onClick={() => goWeek(-1)} className="-ml-2 flex h-8 w-8 items-center justify-center text-[22px] text-[#5b606a]" aria-label="지난주">
+              ‹
+            </button>
+            <h1 className="truncate text-[22px] font-extrabold leading-none tracking-[-.02em] tabular-nums">
+              {md(ttDays[0].date)} – {ttDays[0].date.slice(5, 7) === ttDays[6].date.slice(5, 7) ? `${Number(ttDays[6].date.slice(8))}일` : md(ttDays[6].date)}
+            </h1>
+            <button type="button" onClick={() => goWeek(1)} className="flex h-8 w-8 items-center justify-center text-[22px] text-[#5b606a]" aria-label="다음 주">
+              ›
+            </button>
+          </div>
+        ) : (
+          <h1 className="text-[26px] font-extrabold leading-none tracking-[-.02em]">
+            {m}월<span className="ml-1.5 text-[14px] font-semibold text-muted">{y}</span>
+          </h1>
+        )}
+        <div className="flex flex-none items-center gap-0.5">
+          <button type="button" onClick={nextLevel} className={`${iconBtn} ${tt ? "!bg-sky !text-blue" : ""}`} aria-label="달력 크기 바꾸기">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
               <rect x="4" y="4.5" width="16" height="6.5" rx="2" />
               <rect x="4" y="13" width="16" height="6.5" rx="2" />
@@ -326,13 +655,13 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
         </div>
       </header>
 
-      <div className="mx-2.5 flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-[22px] bg-white">
+      <div className="relative mx-2.5 flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-[22px] bg-white">
         <div
           onPointerDown={onBarDown}
           onPointerMove={onBarMove}
           onPointerUp={onBarUp}
           onPointerCancel={onBarUp}
-          className="relative flex-none cursor-ns-resize touch-none select-none pb-1.5 pt-3"
+          className="relative flex-none cursor-ns-resize touch-none select-none border-b border-[#F1F2F4] pb-1.5 pt-3"
           aria-label="끌어서 달력 크기 바꾸기"
         >
           <div className="grid grid-cols-7 text-center text-[11.5px] font-semibold text-[#8a8f99]">
@@ -342,16 +671,35 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
               </span>
             ))}
           </div>
-          <i className="absolute bottom-0 left-1/2 h-1 w-8 -translate-x-1/2 rounded-full bg-[#E3E5EA]" />
+          <i className="absolute bottom-0.5 left-1/2 h-1 w-8 -translate-x-1/2 rounded-full bg-[#E3E5EA]" />
         </div>
+
+        {/* pull hint: between 주간 and the 시간표 snap */}
+        <div
+          ref={hint}
+          aria-hidden
+          className="pointer-events-none absolute left-1/2 top-12 z-10 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-[rgba(25,25,25,.84)] px-3 py-2 text-[12.5px] font-semibold text-white opacity-0 transition-opacity duration-150"
+        >
+          조금 더 당기면 시간표
+          <i className="relative block h-1 w-[54px] overflow-hidden rounded-sm bg-white/25 after:absolute after:inset-y-0 after:left-0 after:w-[var(--p,0%)] after:rounded-sm after:bg-white" />
+        </div>
+        {toast && (
+          <div className="pointer-events-none absolute bottom-4 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-[rgba(25,25,25,.86)] px-3 py-1.5 text-[12.5px] font-semibold text-white">
+            {toast}
+          </div>
+        )}
 
         <div
           ref={sc}
           onScroll={updateTitle}
+          onPointerDown={onScPointerDown}
+          onPointerMove={onScPointerMove}
+          onPointerUp={onScPointerUp}
+          onPointerCancel={onScPointerUp}
           data-lv="0"
-          className="cal-sc min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-28 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className={`cal-sc relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${tt ? "ttmode" : "pb-28"}`}
         >
-          {weeks.map((wk) => {
+          {weeks.map((wk, wi) => {
             const first = wk.findIndex((d) => d.date.endsWith("-01"));
             return (
               <div key={wk[0].date}>
@@ -362,56 +710,58 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
                     </span>
                   </div>
                 )}
-                <div className="cal-wk" data-wk={(wk.find((d) => d.date.endsWith("-01")) ?? wk[3]).date.slice(0, 7)}>
-                  {wk.map((d) => {
-                    const w = weather[d.date];
-                    const evs = shownEvents(d);
-                    const dow = dowOf(d.date);
-                    const cls = [
-                      "cal-c",
-                      d.date === today && "today",
-                      d.date < today && "past",
-                      dow === 0 && "sun",
-                      dow === 6 && "sat",
-                      sheet?.kind === "day" && sheet.date === d.date && "sel",
-                    ]
-                      .filter(Boolean)
-                      .join(" ");
-                    return (
-                      <div key={d.date} className={cls} data-today={d.date === today ? "" : undefined} onClick={() => open({ kind: "day", date: d.date })}>
-                        <span className="cal-n">{Number(d.date.slice(8))}</span>
-                        <div className="cal-w">{w && <WxIcon kind={wxKind(w.kind, w.mm)} size={22} />}</div>
-                        <div className="cal-dots">
-                          {evs.slice(0, 3).map((e) => (
-                            <i key={e.id} style={{ background: colorOf(e) }} />
-                          ))}
+                <div className="cal-wk" data-wi={wi} data-wk={(wk.find((d) => d.date.endsWith("-01")) ?? wk[3]).date.slice(0, 7)}>
+                  {tt ? (
+                    <WeekTable
+                      wk={wk}
+                      prev={wi > 0 ? weeks[wi - 1][6] : null}
+                      weather={weather}
+                      today={today}
+                      shownEvents={shownEvents}
+                      onDay={(date) => open({ kind: "day", date })}
+                      nowMin={nowMin}
+                    />
+                  ) : (
+                    wk.map((d) => {
+                      const w = weather[d.date];
+                      const evs = shownEvents(d);
+                      const dow = dowOf(d.date);
+                      const cls = [
+                        "cal-c",
+                        d.date === today && "today",
+                        d.date < today && "past",
+                        dow === 0 && "sun",
+                        dow === 6 && "sat",
+                        sheet?.kind === "day" && sheet.date === d.date && "sel",
+                      ]
+                        .filter(Boolean)
+                        .join(" ");
+                      return (
+                        <div key={d.date} className={cls} data-today={d.date === today ? "" : undefined} onClick={() => open({ kind: "day", date: d.date })}>
+                          <span className="cal-n">{Number(d.date.slice(8))}</span>
+                          <div className="cal-w">{w && <WxIcon kind={wxKind(w.kind, w.mm)} size={22} />}</div>
+                          <div className="cal-dots">
+                            {evs.slice(0, 3).map((e) => (
+                              <i key={e.id} style={{ background: colorOf(e.title).fg }} />
+                            ))}
+                          </div>
+                          <div className="cal-bars">
+                            {evs.slice(0, 4).map((e) => (
+                              <i key={e.id} style={{ background: colorOf(e.title).fg }} />
+                            ))}
+                          </div>
+                          <div className="cal-blocks">
+                            {evs.map((e) => (
+                              <div key={e.id} className="cal-blk" style={{ background: colorOf(e.title).bg, color: colorOf(e.title).fg }}>
+                                {e.title}
+                                <small>{e.start || "미정"}</small>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                        <div className="cal-bars">
-                          {evs.slice(0, 4).map((e) => (
-                            <i key={e.id} style={{ background: colorOf(e) }} />
-                          ))}
-                        </div>
-                        <div className="cal-blocks">
-                          {evs.map((e) => (
-                            <div
-                              key={e.id}
-                              className="cal-blk"
-                              style={{
-                                background: `${colorOf(e)}1f`,
-                                color: colorOf(e),
-                              }}
-                            >
-                              {e.title}
-                              <small>
-                                {e.start ? e.start : "미정"}
-                                {e.place ? ` · ${e.place}` : ""}
-                              </small>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
               </div>
             );
@@ -419,30 +769,32 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
         </div>
       </div>
 
-      {/* 오늘 · 오늘 챙길 것 — above the tab bar, left of the + button */}
-      <div className="pointer-events-none fixed bottom-[calc(80px+env(safe-area-inset-bottom))] left-1/2 z-30 flex w-full max-w-md -translate-x-1/2 gap-2 px-5">
-        <button
-          type="button"
-          onClick={goToday}
-          className="pointer-events-auto h-10 rounded-full bg-white px-4 text-[14px] font-bold shadow-[0_4px_14px_rgba(0,0,0,.1)]"
-        >
-          오늘
-        </button>
-        {todayWx && (
+      {/* 오늘 · 오늘 챙길 것 — above the tab bar, left of the + button (not over the 시간표) */}
+      {!tt && (
+        <div className="pointer-events-none fixed bottom-[calc(80px+env(safe-area-inset-bottom))] left-1/2 z-30 flex w-full max-w-md -translate-x-1/2 gap-2 px-5">
           <button
             type="button"
-            onClick={() => open({ kind: "day", date: today })}
-            className="pointer-events-auto flex h-10 items-center gap-1.5 rounded-full bg-sky px-3.5 text-[13.5px] font-bold text-blue shadow-[0_4px_14px_rgba(0,0,0,.08)]"
+            onClick={goToday}
+            className="pointer-events-auto h-10 rounded-full bg-white px-4 text-[14px] font-bold shadow-[0_4px_14px_rgba(0,0,0,.1)]"
           >
-            오늘 챙길 것 {todayWx.advice.length}
-            <span className="flex -space-x-1">
-              {todayWx.advice.slice(0, 3).map((k) => (
-                <AdviceBadge key={k} k={k} size={20} />
-              ))}
-            </span>
+            오늘
           </button>
-        )}
-      </div>
+          {todayWx && (
+            <button
+              type="button"
+              onClick={() => open({ kind: "day", date: today })}
+              className="pointer-events-auto flex h-10 items-center gap-1.5 rounded-full bg-sky px-3.5 text-[13.5px] font-bold text-blue shadow-[0_4px_14px_rgba(0,0,0,.08)]"
+            >
+              오늘 챙길 것 {todayWx.advice.length}
+              <span className="flex -space-x-1">
+                {todayWx.advice.slice(0, 3).map((k) => (
+                  <AdviceBadge key={k} k={k} size={20} />
+                ))}
+              </span>
+            </button>
+          )}
+        </div>
+      )}
 
       {sheet &&
         createPortal(
@@ -478,6 +830,137 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
           </>,
           document.body,
         )}
+    </div>
+  );
+}
+
+// The 시간표 of one week: the same date row as the calendar (so nothing jumps at the switch),
+// a row for 시간 미정 plans if any, then 0–24시 scrolled inside. Overlapping plans cascade to the
+// right with a white edge; a plan past midnight runs to 24시 and continues from 0시 the next day.
+function WeekTable({
+  wk,
+  prev,
+  weather,
+  today,
+  shownEvents,
+  onDay,
+  nowMin,
+}: {
+  wk: CalDay[];
+  prev: CalDay | null;
+  weather: Record<string, DayWeather>;
+  today: string;
+  shownEvents: (d: CalDay) => CalEvt[];
+  onDay: (date: string) => void;
+  nowMin: number;
+}) {
+  const at = (min: number) => `calc(var(--hpx) * ${(min / 60).toFixed(4)})`;
+  const untimed = wk.map((d) => shownEvents(d).filter((e) => !e.start));
+  const hasUntimed = untimed.some((l) => l.length);
+
+  type Block = CalEvt & { from: number; to: number; cont: boolean; lane: number; lanes: number };
+  const blocksOn = (d: CalDay, before: CalDay | null): Block[] => {
+    const list: Block[] = [
+      ...(before ? shownEvents(before).filter(overnight) : []).map((e) => ({ ...e, from: 0, to: toMinutes(e.end), cont: true, lane: 0, lanes: 1 })),
+      ...shownEvents(d)
+        .filter((e) => e.start)
+        .map((e) => ({ ...e, from: toMinutes(e.start), to: overnight(e) ? 1440 : toMinutes(e.end || e.start), cont: false, lane: 0, lanes: 1 })),
+    ]
+      .map((b) => ({ ...b, to: Math.max(b.to, b.from + 15) }))
+      .sort((a, b) => a.from - b.from || b.to - a.to);
+    // overlapping plans take lanes; each later lane is drawn shifted right over the earlier one
+    let group: Block[] = [];
+    let end = -1;
+    const close = () => group.forEach((g) => (g.lanes = Math.max(...group.map((x) => x.lane)) + 1));
+    for (const b of list) {
+      if (b.from >= end) {
+        close();
+        group = [];
+      }
+      const used = group.filter((g) => g.to > b.from).map((g) => g.lane);
+      b.lane = [0, 1, 2, 3].find((l) => !used.includes(l)) ?? 0;
+      group.push(b);
+      end = Math.max(end, b.to);
+    }
+    close();
+    return list;
+  };
+
+  return (
+    <div className="cal-tt">
+      <div className="grid flex-none grid-cols-7">
+        {wk.map((d) => {
+          const w = weather[d.date];
+          const dow = dowOf(d.date);
+          const cls = ["cal-c", d.date === today && "today", d.date < today && "past", dow === 0 && "sun", dow === 6 && "sat"].filter(Boolean).join(" ");
+          return (
+            <div key={d.date} className={cls} data-today={d.date === today ? "" : undefined} onClick={() => onDay(d.date)}>
+              <span className="cal-n">{Number(d.date.slice(8))}</span>
+              <div className="cal-w">{w && <WxIcon kind={wxKind(w.kind, w.mm)} size={22} />}</div>
+            </div>
+          );
+        })}
+      </div>
+      {hasUntimed && (
+        <div className="cal-band">
+          {wk.map((d, i) => (
+            <div key={d.date}>
+              {untimed[i].map((e) => (
+                <span key={e.id} onClick={() => onDay(d.date)}>
+                  {e.title}
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="cal-gs">
+        <div className="cal-grid">
+          {wk.map((d, i) => (
+            <div key={d.date} className={`cal-tc ${d.date === today ? "today" : ""}`}>
+              {blocksOn(d, i > 0 ? wk[i - 1] : prev).map((b) => {
+                const c = colorOf(b.title);
+                const dur = b.to - b.from;
+                const size = dur < 75 ? "short" : dur < 100 ? "mid" : "";
+                return (
+                  <div
+                    key={`${b.id}${b.cont ? "-cont" : ""}`}
+                    className={`cal-ev ${size} ${b.cont ? "cont" : ""} ${b.lane ? "lap" : ""}`}
+                    onClick={() => onDay(d.date)}
+                    style={
+                      {
+                        top: at(b.from),
+                        height: `calc(${at(dur)} - 2px)`,
+                        "--lane": b.lane,
+                        "--lanes": b.lanes,
+                        background: c.bg,
+                        color: c.fg,
+                      } as React.CSSProperties
+                    }
+                  >
+                    <b>{b.title}</b>
+                    {b.cont ? (
+                      <span className="note">어제부터 이어짐</span>
+                    ) : (
+                      overnight(b) && <span className="note">~새벽 {b.end.replace(/^0/, "")}</span>
+                    )}
+                    {!b.cont && b.pop !== null && b.pop >= 30 && <span className="rain">☂{b.pop}%</span>}
+                  </div>
+                );
+              })}
+              {d.date === today && <i className="cal-now" style={{ top: at(nowMin) }} />}
+            </div>
+          ))}
+          {Array.from({ length: 23 }, (_, k) => (
+            <span key={k}>
+              <i className="cal-gl" style={{ top: at((k + 1) * 60) }} />
+              <span className="cal-hl" style={{ top: at((k + 1) * 60) }}>
+                {k + 1}
+              </span>
+            </span>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -558,7 +1041,7 @@ function DaySheet({
             {e.start || "미정"}
             {e.end && <small className="block text-[11px] text-muted">{e.end}</small>}
           </span>
-          <i className="self-stretch rounded-full" style={{ background: colorOf(e) }} />
+          <i className="self-stretch rounded-full" style={{ background: colorOf(e.title).fg }} />
           <span className="min-w-0">
             <b className="block truncate text-[15px] font-semibold">{e.title}</b>
             <small className="block text-[12px] text-muted">
