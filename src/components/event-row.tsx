@@ -31,7 +31,7 @@ export default function EventRow({ event: e, place, wx }: { event: CalEvent; pla
 
 function WeatherLine({ a }: { a: Assessment }) {
   const rain =
-    a.level === "umbrella" ? `☔ 비 ${a.pop ?? "-"}%` : a.level === "folding" ? `🌂 비 ${a.pop}%` : "☀️ 비 소식 없음";
+    a.level === "umbrella" ? `비 ${a.pop ?? "-"}%` : a.level === "folding" ? `비 ${a.pop}%` : "비 소식 없음";
   return (
     <p className={`mt-1 text-sm font-semibold ${a.level === "none" ? "text-muted" : "text-indigo"}`}>
       {rain}

@@ -1055,7 +1055,7 @@ function WeekTable({
                     ) : (
                       overnight(b) && <span className="note">~새벽 {b.end.replace(/^0/, "")}</span>
                     )}
-                    {!b.cont && b.pop !== null && b.pop >= 30 && <span className="rain">☂{b.pop}%</span>}
+                    {!b.cont && b.pop !== null && b.pop >= 30 && <span className="rain">비 {b.pop}%</span>}
                   </div>
                 );
               })}

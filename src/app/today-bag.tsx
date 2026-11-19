@@ -6,6 +6,8 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { flushSync } from "react-dom";
 import { ADVICE_LABEL, type AdviceKey } from "@/lib/advice";
+import { AdviceBadge } from "@/components/icons";
+import { CloseIcon, PlusIcon } from "@/components/line-icons";
 import type { BagItem } from "@/lib/outing";
 import { finishBag, setPacked } from "./actions/bag";
 
@@ -32,6 +34,107 @@ export default function TodayBag(props: { date: string; bag: BagItem[]; packed: 
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const folding = useRef(false);
 
+  // 직접 추가한 물건: 이 기기에만 저장한다 (서버 기록은 앱이 아는 항목만 받는다). 날마다 따로.
+  const extraKey = `cm_bag_extra_${date}`;
+  const [extras, setExtras] = useState<Extra[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState("");
+  useEffect(() => {
+    try {
+      const saved: unknown = JSON.parse(localStorage.getItem(extraKey) ?? "[]");
+      // The device's saved items can only be read once the page is on screen.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (Array.isArray(saved)) setExtras(saved.filter((x): x is Extra => !!x && typeof x.id === "string" && typeof x.name === "string" && typeof x.done === "boolean"));
+    } catch {
+      // No storage (private window): added items just do not persist.
+    }
+  }, [extraKey]);
+  const extraDone = extras.filter((e) => e.done).length;
+
+  function saveExtras(list: Extra[]) {
+    setExtras(list);
+    try {
+      localStorage.setItem(extraKey, JSON.stringify(list));
+    } catch {
+      // see above
+    }
+  }
+  function addExtra() {
+    const name = draft.trim().slice(0, 12);
+    if (!name || extras.length >= 8) return;
+    saveExtras([...extras, { id: Date.now().toString(36), name, done: false }]);
+    setDraft("");
+    setAdding(false);
+  }
+  function toggleExtra(id: string) {
+    clearTimeout(timer.current);
+    const list = extras.map((e) => (e.id === id ? { ...e, done: !e.done } : e));
+    saveExtras(list);
+    const target = list.find((e) => e.id === id);
+    if (target?.done) navigator.vibrate?.(6);
+    // everything packed: fold the card, as when the last bag item is ticked
+    if (target?.done && bag.length > 0 && packed.length + list.filter((e) => e.done).length === bag.length + list.length) timer.current = setTimeout(() => fold(true), 620);
+  }
+
+  // The things the tester added, then the + chip; and the small form that opens from it.
+  const extraChips = (
+    <>
+      {extras.map((e) => (
+        <span key={e.id} className="relative inline-flex">
+          <button type="button" onClick={() => toggleExtra(e.id)} aria-pressed={e.done} className={chipCls(e.done)}>
+            <Tick on={e.done} />
+            <span className="inline-flex items-center gap-1.5">
+              <span className={`grid h-[22px] w-[22px] place-items-center rounded-[7px] text-[12px] font-extrabold ${e.done ? "bg-white text-blue" : "bg-[#EEF2FC] text-blue"}`}>
+                {[...e.name][0]}
+              </span>
+              {e.name}
+            </span>
+          </button>
+          <button
+            type="button"
+            aria-label={`${e.name} 지우기`}
+            onClick={() => saveExtras(extras.filter((x) => x.id !== e.id))}
+            className="absolute -right-1 -top-1 grid h-[18px] w-[18px] place-items-center rounded-full bg-[#9a9a9a] text-white"
+          >
+            <CloseIcon size={10} />
+          </button>
+        </span>
+      ))}
+      {extras.length < 8 && (
+        <button
+          type="button"
+          onClick={() => setAdding((v) => !v)}
+          aria-expanded={adding}
+          className="inline-flex items-center gap-1 rounded-full border-2 border-dashed border-[#AFC3EC] py-[7px] pl-2.5 pr-3.5 text-[14px] font-bold text-blue"
+        >
+          <PlusIcon size={16} />
+          추가
+        </button>
+      )}
+    </>
+  );
+  const extraForm = adding && (
+    <form
+      onSubmit={(ev) => {
+        ev.preventDefault();
+        addExtra();
+      }}
+      className="mt-3 flex gap-2"
+    >
+      <input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder="챙길 물건 (예: 충전기, 텀블러)"
+        maxLength={12}
+        autoFocus
+        className="min-w-0 flex-1 rounded-xl border border-transparent bg-white px-3.5 py-2.5 text-[14px] outline-none focus:border-blue"
+      />
+      <button type="submit" disabled={!draft.trim()} className="flex-none rounded-xl bg-blue px-4 text-[14px] font-extrabold text-white disabled:opacity-40">
+        추가
+      </button>
+    </form>
+  );
+
   if (bag.length === 0) {
     return (
       <section className="relative mb-5 pt-[18px]">
@@ -40,16 +143,18 @@ export default function TodayBag(props: { date: string; bag: BagItem[]; packed: 
           <Zipper zipped />
           <h3 className="text-[15.5px] font-extrabold">오늘의 가방</h3>
           <p className="mt-1.5 text-[12.5px] text-[#5a5a5a]">따로 챙길 건 없어요</p>
+          <div className="mt-3 flex flex-wrap justify-center gap-2">{extraChips}</div>
+          {extraForm}
         </div>
       </section>
     );
   }
 
-  const n = packed.length;
-  const all = bag.length;
+  const n = packed.length + extraDone;
+  const all = bag.length + extras.length;
   const zipped = n === all || finished;
-  const inBag = bag.filter((b) => packed.includes(b.key)).map((b) => nameOf(b.key));
-  const left = bag.filter((b) => !packed.includes(b.key)).map((b) => nameOf(b.key));
+  const inBag = [...bag.filter((b) => packed.includes(b.key)).map((b) => nameOf(b.key)), ...extras.filter((e) => e.done).map((e) => e.name)];
+  const left = [...bag.filter((b) => !packed.includes(b.key)).map((b) => nameOf(b.key)), ...extras.filter((e) => !e.done).map((e) => e.name)];
   const why = [...new Set(bag.map((b) => b.reason).filter(Boolean))].join(" · ");
 
   // Folding: the open part fades out, the card eases to its new height, the other part fades in.
@@ -97,7 +202,7 @@ export default function TodayBag(props: { date: string; bag: BagItem[]; packed: 
     setTimeout(() => setLocal(next), 180);
     start(() => setPacked(date, b.key, true));
     // fold as soon as the zipper line has been drawn
-    if (next.length === all) timer.current = setTimeout(() => fold(true), 620);
+    if (next.length + extraDone === all) timer.current = setTimeout(() => fold(true), 620);
   }
 
   function finish() {
@@ -157,11 +262,16 @@ export default function TodayBag(props: { date: string; bag: BagItem[]; packed: 
                         <path d="M2.5 6.2l2.4 2.4 4.6-5" strokeDasharray="16" style={{ strokeDashoffset: on ? 0 : 16, transition: "stroke-dashoffset .22s .06s ease-out" }} />
                       </svg>
                     </span>
-                    <span data-badge>{nameOf(b.key)}</span>
+                    <span data-badge className="inline-flex items-center gap-1.5">
+                      <AdviceBadge k={b.key} size={22} white={on} />
+                      {nameOf(b.key)}
+                    </span>
                   </button>
                 );
               })}
+              {extraChips}
             </div>
+            {extraForm}
             {why && <p className="mt-3 text-[12.5px] leading-relaxed text-[#5a5a5a]">{why}</p>}
             <button type="button" onClick={finish} className="mt-2.5 px-3 py-1 text-[13px] font-extrabold text-blue">
               완료
@@ -201,5 +311,21 @@ function Zipper({ zipped }: { zipped: boolean }) {
         style={{ left: zipped ? "calc(100% - 40px)" : "50%" }}
       />
     </>
+  );
+}
+
+type Extra = { id: string; name: string; done: boolean };
+
+const chipCls = (on: boolean) =>
+  `inline-flex items-center gap-2 rounded-full py-2 pl-2.5 pr-3.5 text-[14px] font-bold shadow-[0_1px_2px_rgba(30,50,100,.06)] transition-colors duration-200 ${on ? "bg-blue text-white" : "bg-white text-ink"}`;
+
+// The tick circle of a chip (same drawing as the bag items').
+function Tick({ on }: { on: boolean }) {
+  return (
+    <span className={`flex h-5 w-5 flex-none items-center justify-center rounded-full border-2 transition-colors duration-200 ${on ? "border-white bg-white" : "border-[#9a9a9a]"}`}>
+      <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke={BLUE} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2.5 6.2l2.4 2.4 4.6-5" strokeDasharray="16" style={{ strokeDashoffset: on ? 0 : 16, transition: "stroke-dashoffset .22s .06s ease-out" }} />
+      </svg>
+    </span>
   );
 }

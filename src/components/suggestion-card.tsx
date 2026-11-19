@@ -35,16 +35,16 @@ export default function SuggestionCard({ s, dayLabel }: { s: Suggestion; dayLabe
             className={btn}
             onClick={() => answer({ kind: "move", start: m.start, end: m.end }, `${m.start}로 옮겼어요. 그 시간 기준으로 다시 알려 드릴게요!`)}
           >
-            🕒 {m.start}–{m.end}로 옮기기 <span className="font-normal text-muted">· 비 {m.pop}%</span>
+            {m.start}–{m.end}로 옮기기 <span className="font-normal text-muted">· 비 {s.pop ?? "-"}% → {m.pop}%</span>
           </button>
         ))}
         <button disabled={busy} className={btn} onClick={() => answer({ kind: "indoor" }, "실내 일정으로 바꿨어요. 비 걱정 없이 다녀오세요!")}>
-          🏠 실내에서 하기
+          실내에서 하기
         </button>
         <button
           disabled={busy}
           className="w-full py-2 text-sm text-muted underline"
-          onClick={() => answer({ kind: "keep" }, "그대로 둘게요. 우산 꼭 챙기세요 ☔")}
+          onClick={() => answer({ kind: "keep" }, "그대로 둘게요. 우산 꼭 챙기세요")}
         >
           그대로 할게요
         </button>

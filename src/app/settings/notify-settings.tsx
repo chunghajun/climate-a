@@ -2,7 +2,7 @@
 
 // 설정 › 알림: one switch for every push, then when the daily weather alert comes —
 // a chosen time before the day's first trip, or at the 기후 알람 times set on /alarms.
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import InstallGuide from "@/components/install-guide";
 import { TLink } from "@/components/nav-transition";
@@ -50,6 +50,21 @@ export default function NotifySettings({ initial, alarmsLabel }: { initial: Noti
   const push = usePush();
   const [sheet, setSheet] = useState<{ h: number; m: number } | null>(null);
   const [shown, setShown] = useState(false);
+
+  // "이렇게 와요" 예시는 이 기기에서 처음 한 번만 보여 준다.
+  const [preview, setPreview] = useState(false);
+  useEffect(() => {
+    if (!n.on) return;
+    try {
+      if (localStorage.getItem("cm_notif_preview") === "1") return;
+      localStorage.setItem("cm_notif_preview", "1");
+    } catch {
+      // No storage: it just shows each time.
+    }
+    // Whether it was seen before is only known on the device, after the page is on screen.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPreview(true);
+  }, [n.on]);
 
   const save = (next: Notify) => {
     setN(next);
@@ -181,24 +196,28 @@ export default function NotifySettings({ initial, alarmsLabel }: { initial: Noti
             </div>
           </div>
 
-          <p className="mb-1.5 mt-4 text-[12.5px] font-bold text-muted">이렇게 와요</p>
-          <div className="flex items-start gap-3 rounded-[16px] border border-line bg-white px-3.5 py-3">
-            <span className="mt-0.5 flex h-9 w-9 flex-none items-center justify-center rounded-[10px] bg-sky">
-              <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden>
-                <path d="M3 12a9 9 0 0 1 18 0z" fill="#3A6FD8" />
-                <path d="M12 12v6.5a2.2 2.2 0 0 1-4.4 0" fill="none" stroke="#3A6FD8" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-            </span>
-            <span className="min-w-0 text-[13px] leading-relaxed">
-              <b className="block text-[14px]">{n.mode === "first" ? `첫 외출 ${leadLabel(n.leadMin)}이에요` : "오늘 우산 챙기세요"}</b>
-              <span className="text-[#5a5a5a]">
-                {n.mode === "first"
-                  ? "10:30 환경공학I 가는 길에 비 70%예요. 우산과 두꺼운 겉옷을 챙기세요."
-                  : "15:00 구조역학I 가는 길에 비 70%. 밖에서 최저 4°라 두꺼운 겉옷도 챙겨요."}
+          {preview && (
+            <>
+            <p className="mb-1.5 mt-4 text-[12.5px] font-bold text-muted">이렇게 와요</p>
+            <div className="flex items-start gap-3 rounded-[16px] border border-line bg-white px-3.5 py-3">
+              <span className="mt-0.5 flex h-9 w-9 flex-none items-center justify-center rounded-[10px] bg-sky">
+                <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden>
+                  <path d="M3 12a9 9 0 0 1 18 0z" fill="#3A6FD8" />
+                  <path d="M12 12v6.5a2.2 2.2 0 0 1-4.4 0" fill="none" stroke="#3A6FD8" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
               </span>
-              {n.mode === "first" && <span className="mt-1 block text-[12px] text-muted">일정이 없는 날은 알림을 보내지 않아요.</span>}
-            </span>
-          </div>
+              <span className="min-w-0 text-[13px] leading-relaxed">
+                <b className="block text-[14px]">{n.mode === "first" ? `첫 외출 ${leadLabel(n.leadMin)}이에요` : "오늘 우산 챙기세요"}</b>
+                <span className="text-[#5a5a5a]">
+                  {n.mode === "first"
+                    ? "10:30 환경공학I 가는 길에 비 70%예요. 우산과 두꺼운 겉옷을 챙기세요."
+                    : "15:00 구조역학I 가는 길에 비 70%. 밖에서 최저 4°라 두꺼운 겉옷도 챙겨요."}
+                </span>
+                {n.mode === "first" && <span className="mt-1 block text-[12px] text-muted">일정이 없는 날은 알림을 보내지 않아요.</span>}
+              </span>
+            </div>
+            </>
+          )}
         </div>
       </div>
 

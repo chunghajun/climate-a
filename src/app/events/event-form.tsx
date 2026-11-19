@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { saveEvent } from "../actions/events";
 import SubmitButton from "@/components/submit-button";
 import { card, chip, fieldLabel, input } from "@/components/ui";
@@ -20,10 +20,24 @@ type Props = {
   jsKey: string; // Kakao map key for the place search
 };
 
+const toMin = (hhmm: string) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+};
+// Stays on the same day: a start late in the evening ends at 23:59.
+const addMin = (hhmm: string, min: number) => {
+  const t = Math.min(23 * 60 + 59, toMin(hhmm) + min);
+  return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+};
+
 export default function EventForm({ event, places, defaultDate, upcoming = [], from = "/", jsKey }: Props) {
   const [mode, setMode] = useState<"once" | "repeat">(event && !event.date ? "repeat" : "once");
   const [untimed, setUntimed] = useState(!!event?.untimed);
   const [remind, setRemind] = useState(event?.remindBefore != null || event?.remindAt != null);
+  // 끝 시간은 시작 시간을 바꾸면 같은 길이(처음엔 1시간)로 따라 움직이고, 직접 고치면 그 길이를 따른다.
+  const [start, setStart] = useState(event?.start || "09:00");
+  const [end, setEnd] = useState(event?.end || "10:00");
+  const length = useRef(event?.start && event?.end ? Math.max(5, toMin(event.end) - toMin(event.start)) : 60);
 
   return (
     <form action={saveEvent} className="space-y-4">
@@ -98,7 +112,11 @@ export default function EventForm({ event, places, defaultDate, upcoming = [], f
               aria-label="시작"
               required={!untimed}
               disabled={untimed}
-              defaultValue={event?.start || "09:00"}
+              value={start}
+              onChange={(e) => {
+                setStart(e.target.value);
+                if (e.target.value) setEnd(addMin(e.target.value, length.current));
+              }}
               className={`${input} min-w-0`}
             />
             <span className="text-muted">~</span>
@@ -108,7 +126,11 @@ export default function EventForm({ event, places, defaultDate, upcoming = [], f
               aria-label="끝"
               required={!untimed}
               disabled={untimed}
-              defaultValue={event?.end || "10:00"}
+              value={end}
+              onChange={(e) => {
+                setEnd(e.target.value);
+                if (e.target.value && start && toMin(e.target.value) > toMin(start)) length.current = toMin(e.target.value) - toMin(start);
+              }}
               className={`${input} min-w-0`}
             />
           </div>
@@ -118,7 +140,7 @@ export default function EventForm({ event, places, defaultDate, upcoming = [], f
         <div className="rounded-2xl border border-line bg-paper px-3.5 py-3">
           <label className="flex items-center justify-between gap-3">
             <span>
-              <b className="block text-[14.5px]">⏰ 일정 알림</b>
+              <b className="block text-[14.5px]">일정 알림</b>
               <span className="block text-xs text-muted">
                 {untimed ? "날씨와 상관없이, 그날 정한 시각에 알려 드려요" : "날씨와 상관없이, 시작 몇 분 전에 알려 드려요"}
               </span>

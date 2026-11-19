@@ -133,10 +133,10 @@ export default function TodayWeather(p: Props) {
 
         {/* More hours; the bag has its own card above. */}
         <div className="mt-2.5 flex justify-end gap-2 text-ink">
-        <Sheet label="이번 주 날씨 ›" title="이번 주 날씨" subtitle={`📍 ${p.placeLabel} · 오늘부터 7일`}>
+        <Sheet label="이번 주 날씨 ›" title="이번 주 날씨" subtitle={`${p.placeLabel} · 오늘부터 7일`}>
           <WeekWeather weather={p.week} today={p.todayDate} />
         </Sheet>
-        <Sheet label="시간별 더 보기 ›" title="오늘 날씨" subtitle={`📍 ${p.placeLabel}`}>
+        <Sheet label="시간별 더 보기 ›" title="오늘 날씨" subtitle={`${p.placeLabel}`}>
           <div className="flex items-center justify-between rounded-[22px] bg-navy px-5 py-4 text-white">
             <div>
               <p className="text-[11.5px] font-bold tracking-[.06em] text-[#C9D0DE]">NOW</p>
@@ -187,7 +187,7 @@ export default function TodayWeather(p: Props) {
           <div className="mt-2.5 rounded-[20px] border border-line bg-white px-4 py-3">
             <p className="mb-1.5 text-[11px] font-extrabold tracking-[.06em] text-muted">오늘 챙길 것</p>
             {p.bag.length === 0 ? (
-              <p className="py-1.5 text-sm text-soft">오늘은 따로 챙길 게 없어요 🙂</p>
+              <p className="py-1.5 text-sm text-soft">오늘은 따로 챙길 게 없어요</p>
             ) : (
               p.bag.map((b) => (
                 <div key={b.key} className="flex items-center gap-2.5 py-1.5">

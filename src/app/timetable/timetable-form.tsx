@@ -104,7 +104,7 @@ export default function TimetableForm({ places, from = "/" }: { places: Place[];
             e.target.value = "";
           }}
         />
-        <p className="text-lg font-extrabold">{reading ? "캡처를 읽고 있어요… (20초쯤)" : "📷 캡처로 채우기"}</p>
+        <p className="text-lg font-extrabold">{reading ? "캡처를 읽고 있어요… (20초쯤)" : "캡처로 채우기"}</p>
         <p className="mt-1 text-sm text-muted">에브리타임 시간표는 <b>매주 반복</b>으로, 다른 달력 앱 화면은 <b>날짜별 일정</b>으로 알아서 구분해 넣어요.</p>
       </label>
       {notice && <p className="rounded-xl bg-navy/[.06] px-3 py-2.5 text-sm font-semibold text-navy">{notice}</p>}

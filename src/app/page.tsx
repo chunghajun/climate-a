@@ -1,3 +1,4 @@
+dimport { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getBag, getTester, listEvents, listPlaces } from "@/lib/data";
@@ -13,13 +14,13 @@ import type { CalEvent } from "@/lib/types";
 import AutoRefresh from "@/components/auto-refresh";
 import Countdown from "@/components/countdown";
 import Fab from "@/components/fab";
-import HideableLegend from "@/components/hideable-legend";
-import { Legend, WeatherIcon } from "@/components/icons";
-import NotificationCard from "@/components/notification-card";
+import { WeatherIcon } from "@/components/icons";
+import NotifyPrompt from "@/components/notify-prompt";
 import PageHeader from "@/components/page-header";
 import SuggestionCard from "@/components/suggestion-card";
-import { btnPrimary, btnSecondary, card } from "@/components/ui";
+import { DEFAULT_PLACE } from "./default-place";
 import LoginForm from "./login-form";
+import SetupScreen from "./setup-screen";
 import TodayBag from "./today-bag";
 import TodayWeather from "./today-weather";
 
@@ -45,16 +46,29 @@ export default async function Home() {
 
   const { date: today, minutes: now } = kstNow();
   const [events, places, bagState] = await Promise.all([listEvents(tester.code), listPlaces(tester.code), getBag(tester.code, today)]);
+
+  // 초기 설정: 동의한 뒤 처음 한 번. 마치기(또는 ×)를 누르면 이 기기에서는 다시 뜨지 않는다.
+  // 이미 즐겨찾기 장소와 일정이 있는 기존 테스터에게는 뜨지 않는다.
+  const jar = await cookies();
+  const favorites = places.filter((p) => p.favorite);
+  const setupFinished = jar.get("cm_setup")?.value === tester.code;
+  const setupStarted = jar.get("cm_setup_on")?.value === tester.code;
+  if (!setupFinished && (setupStarted || !(favorites.length > 0 && events.length > 0))) {
+    return <SetupScreen code={tester.code} places={favorites} events={events} notify={tester.notify} />;
+  }
+  // 저장한 장소가 없으면 서울 기본 위치로 날씨를 보여 준다 (설정에서 장소를 저장하면 그곳으로 바뀐다).
+  const wxPlaces = places.length ? places : [DEFAULT_PLACE];
   const tomorrow = addDays(today, 1);
   const todayEvents = eventsOn(events, today);
   const [planned, wx] = await Promise.all([
-    places.length && events.length ? planDays(events, places, [today, tomorrow]) : new Map<string, PlannedOuting[]>(),
-    weatherDays(places, today, addDays(today, 6)),
+    events.length ? planDays(events, wxPlaces, [today, tomorrow]) : new Map<string, PlannedOuting[]>(),
+    weatherDays(wxPlaces, today, addDays(today, 6)),
   ]);
   const todayPlanned = planned.get(today) ?? [];
   const summary = wx.summaries.get(today);
   const range = bigRange(today, wx.short[today]);
-  const bag = todayBag(todayPlanned.filter((p) => p.outing.back > now), range, summary?.dressTemp ?? null);
+  // 오늘 일정이 없으면 챙길 것도 없다.
+  const bag = todayEvents.length ? todayBag(todayPlanned.filter((p) => p.outing.back > now), range, summary?.dressTemp ?? null) : [];
   const suggestions = await openSuggestions(
     tester.code,
     [...suggestionsFor(tester.code, today, todayPlanned, now), ...suggestionsFor(tester.code, tomorrow, planned.get(tomorrow) ?? [], null)],
@@ -67,24 +81,19 @@ export default async function Home() {
     <main className="mx-auto w-full max-w-md flex-1 px-5 pb-28 pt-6">
       <PageHeader kicker={`${m}월 ${d}일 ${DOW[dowOf(today)]}`} title="오늘" />
 
-      <div className="space-y-3">
-        <NotificationCard mode="home" />
-        {places.length === 0 && (
-          <section className={card}>
-            <h2 className="text-[17px] font-extrabold">날씨를 볼 동네를 알려 주세요</h2>
-            <p className="mt-1 text-sm text-soft">집이나 학교처럼 자주 가는 곳을 하나 저장하면 그 동네 날씨로 알려 드려요.</p>
-            <Link href="/settings#places" className={`${btnPrimary} mt-4`}>
-              장소 저장하기
-            </Link>
-          </section>
-        )}
-      </div>
-
-      {places.length > 0 && (
+      {wxPlaces.length > 0 && (
         <div className="mt-3">
-          <TodayBag key={today} date={today} bag={bag} packed={bagState.packed} finished={bagState.finished} />
+          {todayEvents.length > 0 && <TodayBag key={today} date={today} bag={bag} packed={bagState.packed} finished={bagState.finished} />}
+          {places.length === 0 && (
+            <p className="mb-2 px-1 text-[12.5px] text-muted">
+              서울 기준 날씨예요. 장소를 입력하면 더 정확하게 알려 드려요.{" "}
+              <Link href="/places/new" className="whitespace-nowrap font-bold text-blue">
+                장소 입력
+              </Link>
+            </p>
+          )}
           <TodayWeather
-            placeLabel={places[0].label}
+            placeLabel={wxPlaces[0].label}
             nowMin={now}
             summary={summary}
             today={wx.short[today]}
@@ -107,30 +116,11 @@ export default async function Home() {
         </div>
       )}
 
-      {events.length === 0 ? (
-        <section className="px-2 pt-6 text-center">
-          <h2 className="text-[17px] font-extrabold">첫 일정을 넣어 볼까요?</h2>
-          <p className="mt-1 text-sm text-soft">일정을 알려 주시면, 기후 알람 시각에 그날 일정의 날씨와 챙길 것을 알려 드릴게요.</p>
-          <div className="mt-4 space-y-2">
-            <Link href="/timetable?from=/" className={btnPrimary}>
-              수업 시간표 넣기 (캡처로 한 번에)
-            </Link>
-            <Link href="/events/new?from=/" className={btnSecondary}>
-              일정 하나 추가하기
-            </Link>
-          </div>
-        </section>
-      ) : (
-        <Timeline events={todayEvents} placeOf={(e) => places.find((p) => p.id === e.placeId)?.label ?? ""} nextTrip={todayPlanned.find((p) => p.outing.depart >= now - 5)} now={now} short={wx.short[today]} />
-      )}
+      <Timeline events={todayEvents} placeOf={(e) => places.find((p) => p.id === e.placeId)?.label ?? ""} nextTrip={todayPlanned.find((p) => p.outing.depart >= now - 5)} now={now} short={wx.short[today]} />
 
-      <div className="mt-4">
-        <HideableLegend>
-          <Legend temps />
-        </HideableLegend>
-      </div>
       <Fab />
       <AutoRefresh />
+      <NotifyPrompt code={tester.code} initial={tester.notify} />
     </main>
   );
 }
@@ -151,7 +141,7 @@ function Timeline(props: { events: CalEvent[]; placeOf: (e: CalEvent) => string;
     return { kind: hourKind(short?.h[String(from).padStart(2, "0")]), pop: pops.length ? Math.max(...pops) : null };
   };
 
-  if (events.length === 0) return <p className="rounded-2xl bg-gray px-4 py-5 text-center text-sm text-soft">오늘은 일정이 없어요. 여유로운 하루 보내세요 🙂</p>;
+  if (events.length === 0) return <p className="rounded-2xl bg-gray px-4 py-5 text-center text-sm text-soft">오늘은 일정이 없어요. 여유로운 하루 보내세요</p>;
 
   return (
     <section>
@@ -199,7 +189,7 @@ function Timeline(props: { events: CalEvent[]; placeOf: (e: CalEvent) => string;
             {untimed.map((e) => (
               <Link key={e.id} href={`/events/${e.id}?from=/`} className="rounded-[10px] bg-gray px-3 py-2 text-[13px] font-semibold text-[#4a4a4a]">
                 {e.title}
-                {e.remindAt && <span className="ml-1 text-muted">· ⏰ {e.remindAt}</span>}
+                {e.remindAt && <span className="ml-1 text-muted">· 알림 {e.remindAt}</span>}
               </Link>
             ))}
           </div>

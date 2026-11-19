@@ -3,6 +3,7 @@ import { getTester } from "@/lib/data";
 import { OUTFITS } from "@/lib/advice";
 import BackHeader from "@/components/back-header";
 import { AdviceBadge, WeatherIcon } from "@/components/icons";
+import { BellIcon, CameraIcon, InfoIcon } from "@/components/line-icons";
 import { btnPrimary } from "@/components/ui";
 
 // What only CliMate does — shown big.
@@ -11,7 +12,7 @@ const SIGNATURE: { title: string; body: string; why: string; visual: React.React
     title: "내 일정 맞춤 출발 알림",
     body: "기후 알람으로 정한 시각에, 그날 일정의 가는 길·일정 중·돌아오는 길 날씨까지 보고 알려 드려요.",
     why: "날씨 앱은 ‘지금 여기’만 알려 주지만, CliMate는 내 일정과 이동 시간을 알아요.",
-    visual: <span className="text-2xl">🔔</span>,
+    visual: <BellIcon size={26} className="text-blue" />,
   },
   {
     title: "오늘의 가방",
@@ -45,7 +46,7 @@ const SIGNATURE: { title: string; body: string; why: string; visual: React.React
     title: "캡처 한 장으로 일정 넣기",
     body: "에브리타임 시간표는 매주 반복으로, 다른 달력 앱 화면은 날짜별 일정으로 AI가 알아서 넣어 줘요.",
     why: "일정을 하나하나 칠 필요 없이, 저장 전에 확인만 하면 돼요.",
-    visual: <span className="text-2xl">📷</span>,
+    visual: <CameraIcon size={26} className="text-blue" />,
   },
 ];
 
@@ -54,7 +55,7 @@ const DETAILS: { group: string; items: [string, string][] }[] = [
   {
     group: "알림",
     items: [
-      ["⏰ 일정 알림", "켠 일정만, 시작 정각~3시간 전(5분 단위)에 알림. 날씨 알림과 시각이 겹치면 하나로 합쳐요."],
+      ["일정 알림", "켠 일정만, 시작 정각~3시간 전(5분 단위)에 알림. 날씨 알림과 시각이 겹치면 하나로 합쳐요."],
       ["받을 알림 고르기", "설정 → 받을 알림에서 우산·접이식·옷차림·폭염·일교차·일정 제안 알림을 켜고 꺼요. 화면 아이콘은 그대로 보여요."],
       ["알림 반응", "알림을 누르면 ‘챙겼어요 / 원래 있었어요 / 필요 없어요’로 알려 줄 수 있어요."],
     ],
@@ -98,23 +99,30 @@ export default async function GuidePage() {
         <p className="mb-2 text-[11px] font-extrabold tracking-[.08em] text-coral">ONLY IN CLIMATE</p>
         <div className="space-y-2.5">
           {SIGNATURE.map((f, i) => (
-            <article key={f.title} className="rounded-[22px] border border-line bg-white px-4 py-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-extrabold text-coral">0{i + 1}</p>
-                  <h2 className="mt-0.5 font-serif text-[22px] font-bold leading-snug">{f.title}</h2>
-                </div>
-                <span className="flex h-12 min-w-12 flex-none items-center justify-center rounded-2xl bg-paper px-2 text-navy">{f.visual}</span>
+            // 제목만 먼저 보이고, (i)를 누르면 설명이 펼쳐진다.
+            <details key={f.title} className="group rounded-[22px] border border-line bg-white">
+              <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5 [&::-webkit-details-marker]:hidden">
+                <span className="flex h-11 w-[68px] flex-none items-center justify-center rounded-2xl bg-paper text-navy">{f.visual}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-extrabold text-coral">0{i + 1}</span>
+                  <h2 className="font-serif text-[19px] font-bold leading-snug">{f.title}</h2>
+                </span>
+                <InfoIcon className="flex-none text-faint transition-colors group-open:text-blue" />
+              </summary>
+              <div className="px-4 pb-4">
+                <p className="text-[14.5px] leading-relaxed">{f.body}</p>
+                <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted">{f.why}</p>
               </div>
-              <p className="mt-2 text-[14.5px] leading-relaxed">{f.body}</p>
-              <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted">{f.why}</p>
-            </article>
+            </details>
           ))}
         </div>
       </section>
 
-      <section className="rounded-[20px] border border-line bg-white px-4 py-3.5">
-        <p className="text-[11px] font-extrabold tracking-[.08em] text-muted">ALL FEATURES</p>
+      <details className="group rounded-[20px] border border-line bg-white px-4 py-3.5">
+        <summary className="flex cursor-pointer list-none items-center justify-between [&::-webkit-details-marker]:hidden">
+          <span className="text-[11px] font-extrabold tracking-[.08em] text-muted">ALL FEATURES · 모든 기능</span>
+          <InfoIcon className="text-faint transition-colors group-open:text-blue" />
+        </summary>
         {DETAILS.map((g) => (
           <div key={g.group} className="mt-3">
             <p className="text-[13px] font-extrabold">{g.group}</p>
@@ -151,7 +159,7 @@ export default async function GuidePage() {
             <b className="text-hi">↑</b>최고 <b className="text-lo">↓</b>최저 기온 · 날씨는 기상청 예보 기준이에요.
           </p>
         </div>
-      </section>
+      </details>
 
       <Link href="/" className={btnPrimary}>
         {tester ? "오늘 화면으로" : "시작하기"}

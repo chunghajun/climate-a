@@ -5,6 +5,7 @@
 import { useCallback, useRef, useState } from "react";
 import { searchPlaces, type PlaceResult } from "../actions/settings";
 import { btnPrimary, btnSecondary, input } from "@/components/ui";
+import { PinIcon } from "@/components/line-icons";
 import PlaceMap, { type Spot } from "./place-map";
 
 type Props = {
@@ -51,7 +52,7 @@ export default function PlacePicker({ jsKey, confirmLabel, onPick, compact = fal
     const rows = await searchPlaces(q);
     if (n !== latest.current) return;
     setResults(rows);
-    setStatus(rows.length || q.trim().length < 2 ? "" : "찾지 못했어요. 장소 이름이나 동 이름(예: 고려대 하나스퀘어, 안암동)으로 검색해 보세요.");
+    setStatus(rows.length || q.trim().length < 2 ? "" : "찾지 못했어요. 장소 이름이나 동 이름(예: 고려대학교, 안암동)으로 검색해 보세요.");
   }
   const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
   function type(q: string) {
@@ -101,7 +102,7 @@ export default function PlacePicker({ jsKey, confirmLabel, onPick, compact = fal
               search(query);
             }
           }}
-          placeholder={placeholder ?? "장소나 동 이름 (예: 고려대 하나스퀘어)"}
+          placeholder={placeholder ?? "예: 고려대학교, 안암역"}
           className={`${input} !pl-10`}
           enterKeyHint="search"
         />
@@ -147,7 +148,10 @@ export default function PlacePicker({ jsKey, confirmLabel, onPick, compact = fal
       ) : (
         !compact && (
           <button type="button" onClick={here} disabled={busy} className={`${btnSecondary} mt-2`}>
-            📍 지금 있는 곳
+            <span className="inline-flex items-center gap-1.5">
+              <PinIcon className="text-blue" />
+              지금 있는 곳
+            </span>
           </button>
         )
       )}

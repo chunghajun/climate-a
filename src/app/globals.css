@@ -113,7 +113,7 @@ body {
 .cal-ev .note { display: block; margin-top: 1px; font-size: 9px; font-weight: 700; opacity: .75; }
 .cal-ev .rain { display: block; margin-top: 2px; font-size: 9px; font-weight: 800; color: #1f5fd6; }
 .cal-ev.short .rain, .cal-ev.mid .rain { position: absolute; right: 3px; bottom: 3px; margin: 0; width: 16px; height: 16px; border-radius: 50%; background: #fff; font-size: 0; display: flex; align-items: center; justify-content: center; }
-.cal-ev.short .rain::after, .cal-ev.mid .rain::after { content: "☂"; font-size: 10px; color: #1f5fd6; }
+.cal-ev.short .rain::after, .cal-ev.mid .rain::after { content: "비"; font-size: 10px; color: #1f5fd6; }
 .cal-now { position: absolute; left: 0; right: 0; z-index: 3; height: 2px; background: #e5484d; pointer-events: none; }
 .cal-now::before { content: ""; position: absolute; left: -3px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: #e5484d; }
 

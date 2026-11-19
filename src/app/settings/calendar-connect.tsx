@@ -72,13 +72,13 @@ export default function CalendarConnect({ url, lastSync }: { url: string | null;
           </li>
           <li>아래 칸에 붙여넣기</li>
           <li className="list-none text-xs text-muted">
-            ⚠️ 공개 캘린더 링크는 링크를 아는 사람이면 누구나 볼 수 있어요. 테스트가 끝나면 공개를 꺼 주세요.
+            링크를 아는 사람은 누구나 볼 수 있어요. 테스트가 끝나면 공개를 꺼 주세요.
           </li>
         </ol>
       ) : (
         <ol className="list-decimal space-y-1 pl-5 text-sm leading-relaxed">
           <li>
-            컴퓨터에서 <b>calendar.google.com</b> → 오른쪽 위 ⚙️ <b>설정</b>
+            컴퓨터에서 <b>calendar.google.com</b> → 오른쪽 위 <b>설정</b>
           </li>
           <li>
             왼쪽 <b>내 캘린더의 설정</b>에서 캘린더를 골라요
