@@ -29,7 +29,8 @@ export type CalEvt = {
 };
 export type CalDay = { date: string; events: CalEvt[] };
 const LEVELS = [70, 100, 142, 210]; // 촘촘 · 막대 · 블록 · 주간 — 주간 grows to fit the busiest day
-const levelOf = (rh: number) => (rh < 85 ? 0 : rh < 121 ? 1 : rh < 176 ? 2 : 3);
+// which look a row height gets: halfway between two levels it switches to the next one
+const levelOf = (rh: number, lv: number[]) => (rh < (lv[0] + lv[1]) / 2 ? 0 : rh < (lv[1] + lv[2]) / 2 ? 1 : rh < (lv[2] + lv[3]) / 2 ? 2 : 3);
 const LABEL_H = 28; // month label row
 const SNAP = 0.75; // a week taller than this share of the screen becomes the 시간표
 const SMOOTH = "cubic-bezier(.2,.8,.2,1)";
@@ -140,45 +141,80 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
   const locked = useRef(false); // an animation owns the calendar
   const hold = useRef(false); // this gesture already snapped one way; it ends without doing more
 
+  // Zooming touches the page as little as possible: positions come from arithmetic (week index ×
+  // row height + the month labels above), never from measuring, and nothing is written twice.
+  const labelsUpTo = useMemo(() => {
+    let n = 0;
+    return weeks.map((wk) => (wk.some((d) => d.date.endsWith("-01")) ? ++n : n));
+  }, [weeks]);
+  const weekTop = useCallback((i: number, h: number) => i * h + labelsUpTo[i] * LABEL_H, [labelsUpTo]);
+  // which week a y position (in scroll coordinates) falls in, and how far down it
+  const rowAt = useCallback(
+    (y: number, h: number) => {
+      let i = 0;
+      while (i + 1 < labelsUpTo.length && weekTop(i + 1, h) <= y) i++;
+      return { i, frac: Math.max(0, Math.min(1, (y - weekTop(i, h)) / h)) };
+    },
+    [labelsUpTo, weekTop],
+  );
+  const viewH = useRef(600); // the scroller's height, kept current on resize so frames never measure it
+  // the week rows, collected after every render so a frame only writes their heights
+  const rows = useRef<HTMLElement[]>([]);
+  useLayoutEffect(() => {
+    rows.current = sc.current ? [...sc.current.querySelectorAll<HTMLElement>(".cal-wk")] : [];
+    const px = `${rh.current}px`;
+    for (const w of rows.current) if (w.style.height !== px) w.style.setProperty("height", px);
+  });
+  const shownLv = useRef(-1);
+  const hintOn = useRef(false);
   const apply = useCallback((h: number) => {
     const el = sc.current;
     if (!el) return;
     rh.current = h;
-    el.style.setProperty("--rh", `${h}px`);
-    el.dataset.lv = String(levelOf(h));
+    // each week gets its own height: a value on the scroller would restyle every element inside it
+    const px = `${h}px`;
+    for (const w of rows.current) w.style.setProperty("height", px);
+    const lv = levelOf(h, levels.current);
+    if (lv !== shownLv.current) {
+      shownLv.current = lv;
+      el.dataset.lv = String(lv);
+    }
     // between 주간 and the snap, a small bar shows how much further to pull
-    const p = (h - levels.current[3]) / (Math.round(el.clientHeight * SNAP) - levels.current[3]);
+    const p = (h - levels.current[3]) / (Math.round(viewH.current * SNAP) - levels.current[3]);
     const on = !ttRef.current && gestureOn.current && p > 0.08;
-    hint.current?.classList.toggle("opacity-100", on);
-    hint.current?.classList.toggle("opacity-0", !on);
-    hint.current?.style.setProperty("--p", `${Math.max(0, Math.min(1, p)) * 100}%`);
+    if (on !== hintOn.current) {
+      hintOn.current = on;
+      hint.current?.classList.toggle("opacity-100", on);
+      hint.current?.classList.toggle("opacity-0", !on);
+    }
+    if (on) hint.current?.style.setProperty("--p", `${Math.max(0, Math.min(1, p)) * 100}%`);
   }, []);
 
+  // the month of the week a third of the way down (where today's week sits when opened), once a frame
+  const titleFrame = useRef(0);
   const updateTitle = useCallback(() => {
-    const el = sc.current;
-    if (!el || ttRef.current) return;
-    // the month of the week a third of the way down, where today's week sits when opened
-    const y = el.scrollTop + el.clientHeight / 3;
-    let m = "";
-    el.querySelectorAll<HTMLElement>("[data-wk]").forEach((w) => {
-      if (w.offsetTop <= y || !m) m = w.dataset.wk!;
+    if (titleFrame.current) return;
+    titleFrame.current = requestAnimationFrame(() => {
+      titleFrame.current = 0;
+      const el = sc.current;
+      if (!el || ttRef.current) return;
+      const wk = weeks[rowAt(el.scrollTop + viewH.current / 3, rh.current).i];
+      if (wk) setTitle((wk.find((d) => d.date.endsWith("-01")) ?? wk[3]).date.slice(0, 7));
     });
-    if (m) setTitle(m);
-  }, []);
+  }, [weeks, rowAt]);
 
   // zoom around a point (px from the scroller's top) so the week under it stays put
   const zoomTo = useCallback(
     (h: number, anchor: number) => {
       const el = sc.current;
       if (!el) return;
-      h = Math.max(levels.current[0] - 10, Math.min(Math.round(el.clientHeight * SNAP) + 2, h));
-      const y = el.scrollTop + anchor;
-      const labels = [...el.querySelectorAll<HTMLElement>("[data-month]")].filter((l) => l.offsetTop < y).length * LABEL_H;
-      const rows = (y - labels) / rh.current;
+      h = Math.max(levels.current[0] - 10, Math.min(Math.round(viewH.current * SNAP) + 2, h));
+      // read first, then write: the week under the anchor keeps the same spot after the resize
+      const { i, frac } = rowAt(el.scrollTop + anchor, rh.current);
       apply(h);
-      el.scrollTop = rows * h + labels - anchor;
+      el.scrollTop = weekTop(i, h) + frac * h - anchor;
     },
-    [apply],
+    [apply, rowAt, weekTop],
   );
 
   const todayAnchor = useCallback(() => {
@@ -217,10 +253,12 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
     if (!el || ttRef.current) return;
     const keepLv = el.dataset.lv;
     el.dataset.lv = "3";
+    el.classList.add("measuring");
     el.querySelectorAll<HTMLElement>(".cal-wk").forEach((w) => (w.style.height = "auto"));
     let need = 0;
     el.querySelectorAll<HTMLElement>(".cal-c").forEach((c) => (need = Math.max(need, c.scrollHeight)));
-    el.querySelectorAll<HTMLElement>(".cal-wk").forEach((w) => (w.style.height = ""));
+    el.querySelectorAll<HTMLElement>(".cal-wk").forEach((w) => (w.style.height = `${rh.current}px`));
+    el.classList.remove("measuring");
     el.dataset.lv = keepLv;
     levels.current[3] = Math.max(170, Math.min(need + 10, Math.round(el.clientHeight * SNAP) - 40));
   }, []);
@@ -228,7 +266,9 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
   // about 13 hours of the 시간표 fit on screen, the same in every week
   const setHourHeight = useCallback(() => {
     const el = sc.current;
-    if (el) el.style.setProperty("--hpx", `${Math.max(34, Math.round((el.clientHeight - 80) / 13))}px`);
+    if (!el) return;
+    viewH.current = el.clientHeight;
+    el.style.setProperty("--hpx", `${Math.max(34, Math.round((el.clientHeight - 80) / 13))}px`);
   }, []);
 
   // ---- into and out of the 시간표 ----
@@ -277,7 +317,7 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
   useLayoutEffect(() => {
     if (ttRef.current) return;
     fit();
-    if (rh.current > levels.current[3] || levelOf(rh.current) === 3) apply(levels.current[3]);
+    if (rh.current > levels.current[3] || levelOf(rh.current, levels.current) === 3) apply(levels.current[3]);
   }, [hideRepeat, fit, apply]);
   useEffect(() => {
     const onResize = () => {
@@ -430,9 +470,30 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
     },
     [apply, leaveTimetable, snapToTimetable, zoomTo],
   );
+  // gesture steps are gathered and applied once per animation frame
+  const queued = useRef<{ h: number; a: number } | null>(null);
+  const queueFrame = useRef(0);
+  const queue = useCallback((h: number, a: number) => {
+    queued.current = { h, a };
+    if (queueFrame.current) return;
+    queueFrame.current = requestAnimationFrame(() => {
+      queueFrame.current = 0;
+      const q = queued.current;
+      queued.current = null;
+      if (q) gesture(q.h, q.a);
+    });
+  }, [gesture]);
+  const flushQueue = useCallback(() => {
+    cancelAnimationFrame(queueFrame.current);
+    queueFrame.current = 0;
+    const q = queued.current;
+    queued.current = null;
+    if (q) gesture(q.h, q.a);
+  }, [gesture]);
   const gestureEnd = useCallback(
     (anchor: number) => {
       const el = sc.current;
+      flushQueue();
       gestureOn.current = false;
       const held = hold.current;
       hold.current = false;
@@ -449,7 +510,7 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
       }
       settle(null, anchor);
     },
-    [apply, settle],
+    [apply, settle, flushQueue],
   );
 
   // pinch (two fingers) and Ctrl + wheel / trackpad pinch
@@ -470,7 +531,7 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
     const onMove = (e: TouchEvent) => {
       if (!pinch || e.touches.length !== 2) return;
       e.preventDefault();
-      gesture(pinch.rh * (spread(e.touches) / pinch.dist), pinch.anchor);
+      queue(pinch.rh * (spread(e.touches) / pinch.dist), pinch.anchor);
     };
     const onEnd = (e: TouchEvent) => {
       if (pinch && e.touches.length < 2) {
@@ -486,7 +547,7 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
       cancelAnimationFrame(anim.current);
       gestureOn.current = true;
       const a = ttRef.current ? 0 : e.clientY - el.getBoundingClientRect().top;
-      gesture(rh.current * Math.exp(-e.deltaY / 120), a);
+      queue((queued.current?.h ?? rh.current) * Math.exp(-e.deltaY / 120), a);
       clearTimeout(wheelT);
       wheelT = setTimeout(() => gestureEnd(a), 170);
     };
@@ -506,7 +567,7 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
       el.removeEventListener("gesturestart", noPageZoom);
       clearTimeout(wheelT);
     };
-  }, [gesture, gestureEnd]);
+  }, [queue, gestureEnd]);
 
   // one finger: drag the weekday bar down to stretch, up to shrink
   const drag = useRef<{ y: number; rh: number; anchor: number } | null>(null);
@@ -517,7 +578,7 @@ export default function CalendarView({ days, weather, today }: { days: CalDay[];
     e.currentTarget.setPointerCapture(e.pointerId);
   };
   const onBarMove = (e: React.PointerEvent) => {
-    if (drag.current) gesture(drag.current.rh * Math.exp((e.clientY - drag.current.y) / 210), drag.current.anchor);
+    if (drag.current) queue(drag.current.rh * Math.exp((e.clientY - drag.current.y) / 210), drag.current.anchor);
   };
   const onBarUp = () => {
     if (!drag.current) return;

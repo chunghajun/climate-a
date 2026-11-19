@@ -59,10 +59,9 @@ body {
 }
 
 /* ---- 달력: one calendar that stretches from month to week (app/calendar) ----
-   The row height lives in --rh on the scroller; data-lv picks what a day shows:
+   Each week row gets its height inline (set by the zoom); data-lv on the scroller picks what a day shows:
    0 점 · 1 막대 · 2 제목 블록 · 3 시간·장소까지 (주간). Zooming only changes these two. */
-.cal-sc { --rh: 70px; }
-.cal-wk { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); height: var(--rh); border-top: 1px solid #f1f2f4; overflow: hidden; }
+.cal-wk { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); height: 70px; border-top: 1px solid #f1f2f4; overflow: hidden; }
 .cal-ml { height: 28px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); align-items: end; padding-bottom: 3px; font-size: 14px; font-weight: 800; color: var(--color-blue); }
 .cal-c { position: relative; min-width: 0; overflow: hidden; padding: 6px 1px 0; text-align: center; cursor: pointer; }
 .cal-n { display: inline-flex; min-width: 26px; height: 26px; padding: 0 3px; align-items: center; justify-content: center; border-radius: 13px; font-size: 15px; font-variant-numeric: tabular-nums; }
@@ -117,3 +116,9 @@ body {
 .cal-ev.short .rain::after, .cal-ev.mid .rain::after { content: "☂"; font-size: 10px; color: #1f5fd6; }
 .cal-now { position: absolute; left: 0; right: 0; z-index: 3; height: 2px; background: #e5484d; pointer-events: none; }
 .cal-now::before { content: ""; position: absolute; left: -3px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: #e5484d; }
+
+/* Smooth stretching: the browser must not shift the scroll on its own while rows resize, and weeks
+   off screen skip layout and paint (measuring the busiest day turns that off for a moment). */
+.cal-sc { overflow-anchor: none; }
+.cal-wk { content-visibility: auto; contain-intrinsic-size: auto 70px; }
+.cal-sc.measuring .cal-wk { content-visibility: visible; }
