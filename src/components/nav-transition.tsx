@@ -6,7 +6,7 @@
 //   tab-next / tab-prev — 오늘·이번 주·이번 달: the copy fades out, the new page slides in 18px
 //   push — 설정, + menu screens: the new page comes in from the right over the copy
 //   pop  — back: the copy slides away to the right, revealing the new page
-// Links prefetch their page, so the new screen usually arrives with its content at once.
+// Tab links prefetch their page, so switching tabs shows the content at once.
 // Tabs replace the history entry, so the phone's own back swipe does not cycle through them.
 import { useLayoutEffect, useRef } from "react";
 import Link from "next/link";
@@ -61,14 +61,11 @@ export function useNavTransition() {
 // Wraps every page (app/template.tsx, which remounts on each navigation): plays the entrance.
 export function PageShell({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-  const router = useRouter();
   useLayoutEffect(() => {
     const p = pending;
     pending = null;
     const el = ref.current;
     if (!p || !el) return;
-    // the page may have been shown from a prefetch; once it has settled, quietly bring it up to date
-    setTimeout(() => router.refresh(), 400);
     const copy = p.copy;
     if (copy) copy.style.visibility = "visible";
     const done = () => copy?.remove();
@@ -91,7 +88,7 @@ export function PageShell({ children }: { children: React.ReactNode }) {
       copy?.animate([{ transform: "none" }, { transform: "translateX(100%)" }], { duration: 260, easing: EASE, fill: "forwards" }).finished.then(done);
       el.animate([{ transform: "translateX(-40px)", opacity: 0.6 }, { transform: "none", opacity: 1 }], { duration: 260, easing: EASE });
     }
-  }, [router]);
+  }, []);
   return (
     <div ref={ref} data-page-shell className="relative z-[1] flex min-h-dvh flex-1 flex-col bg-paper">
       {children}
@@ -105,7 +102,7 @@ export function TLink({ href, kind, onClick, ...rest }: React.ComponentProps<typ
   return (
     <Link
       href={href}
-      prefetch
+      prefetch={kind.startsWith("tab") ? true : undefined}
       {...rest}
       onClick={(e) => {
         onClick?.(e);

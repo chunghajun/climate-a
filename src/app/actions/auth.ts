@@ -60,7 +60,8 @@ async function setSession(code: string) {
 export async function giveConsent() {
   const tester = await getTester();
   if (!tester) redirect("/");
-  await testerRef(tester.code).update({ consentAt: FieldValue.serverTimestamp() });
+  // cronNextAt 0: the cron picks the new tester up on its next run
+  await testerRef(tester.code).update({ consentAt: FieldValue.serverTimestamp(), cronNextAt: 0 });
   await logEvent(tester.code, "consent");
   redirect("/");
 }

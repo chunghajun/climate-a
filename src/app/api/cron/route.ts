@@ -23,7 +23,7 @@ const CATCH_UP = 15;
 const SUGGEST_AHEAD = 2 * 60; // change suggestions only while this much time is left
 const QUIET_START = 22 * 60; // no suggestion pushes 22시–7시
 const QUIET_END = 7 * 60;
-const RECHECK = 30; // minutes: forecast changes (suggestions) are looked at this often
+const RECHECK = 60; // minutes: forecast changes (suggestions) are looked at this often
 
 webpush.setVapidDetails(
   process.env.VAPID_SUBJECT!.trim(),
@@ -61,11 +61,13 @@ export async function GET(request: Request) {
   if (!secret || given !== secret) return new Response("unauthorized", { status: 401 });
 
   const { date, minutes } = kstNow();
-  const testers = (await db().collection("testers").get()).docs.filter((d) => d.data().consentAt);
+  // Only testers whose next check has come (cronNextAt is set when they consent and moved
+  // forward after every check; editing anything resets it to 0). Idle and unused codes cost nothing.
+  const testers = (await db().collection("testers").where("cronNextAt", "<=", Date.now()).get()).docs.filter((d) => d.data().consentAt);
   const summary = { testers: testers.length, idle: 0, due: 0, sent: 0, skipped: 0, reminders: 0, suggestions: 0 };
 
-  // Keep every saved place's forecast fresh, so pages can read the cache without
-  // waiting for the KMA. This also keeps the record of forecasts and observations going.
+  // Keep the forecasts of these testers' places fresh, so pages can read the cache without waiting
+  // for the KMA (every tester comes due at least hourly, so every saved place stays current).
   const placesByCode = new Map(await Promise.all(testers.map(async (t) => [t.id, await listPlaces(t.id)] as const)));
   const grids = new Map<string, Grid>();
   for (const list of placesByCode.values())
