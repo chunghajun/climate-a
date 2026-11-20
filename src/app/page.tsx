@@ -67,8 +67,8 @@ export default async function Home() {
   const todayPlanned = planned.get(today) ?? [];
   const summary = wx.summaries.get(today);
   const range = bigRange(today, wx.short[today]);
-  // 오늘 일정이 없으면 챙길 것도 없다.
-  const bag = todayEvents.length ? todayBag(todayPlanned.filter((p) => p.outing.back > now), range, summary?.dressTemp ?? null) : [];
+  // 오늘 일정이 없어도 가방은 보인다: 아침 기온으로 옷차림을 추천하고, 내 물건을 직접 넣을 수 있다.
+  const bag = todayBag(todayPlanned.filter((p) => p.outing.back > now), range, summary?.dressTemp ?? null);
   const suggestions = await openSuggestions(
     tester.code,
     [...suggestionsFor(tester.code, today, todayPlanned, now), ...suggestionsFor(tester.code, tomorrow, planned.get(tomorrow) ?? [], null)],
@@ -83,7 +83,7 @@ export default async function Home() {
 
       {wxPlaces.length > 0 && (
         <div className="mt-3">
-          {todayEvents.length > 0 && <TodayBag key={today} date={today} bag={bag} packed={bagState.packed} finished={bagState.finished} extras={bagState.extras} />}
+          <TodayBag key={today} date={today} bag={bag} packed={bagState.packed} finished={bagState.finished} extras={bagState.extras} />
           {places.length === 0 && (
             <p className="mb-2 px-1 text-[12.5px] text-muted">
               서울 기준 날씨예요. 장소를 입력하면 더 정확하게 알려 드려요.{" "}
