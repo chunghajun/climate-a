@@ -9,23 +9,27 @@ import { ADVICE_LABEL, type AdviceKey } from "@/lib/advice";
 import { AdviceBadge } from "@/components/icons";
 import { CloseIcon, PlusIcon } from "@/components/line-icons";
 import type { BagItem } from "@/lib/outing";
-import { finishBag, setPacked } from "./actions/bag";
+import { finishBag, saveBagExtras, setPacked, type ExtraChange } from "./actions/bag";
 
 const nameOf = (k: AdviceKey) => (k === "range" ? "겉옷" : k === "heat" ? "물" : ADVICE_LABEL[k]);
 const SMOOTH = "cubic-bezier(.4,0,.2,1)";
 
 // What was ticked in this visit to the app, so a prefetched (older) 오늘 page shows the bag as left.
-const latest = new Map<string, { packed: string[]; finished: boolean }>();
+const latest = new Map<string, { packed: string[]; finished: boolean; extras: Extra[] }>();
 
-export default function TodayBag(props: { date: string; bag: BagItem[]; packed: string[]; finished: boolean }) {
+export default function TodayBag(props: { date: string; bag: BagItem[]; packed: string[]; finished: boolean; extras: Extra[] }) {
   const { date, bag } = props;
   const known = latest.get(date) ?? props;
   const [packed, setLocal] = useState(known.packed.filter((k) => bag.some((b) => b.key === k)));
   const [finished, setFinished] = useState(known.finished);
-  const [collapsed, setCollapsed] = useState(known.finished || (bag.length > 0 && bag.every((b) => known.packed.includes(b.key))));
+  // 직접 추가한 물건: 서버(그날 가방 문서)에 저장하고, 바꿀 때마다 연구 기록도 남긴다. 날마다 따로.
+  const [extras, setExtras] = useState<Extra[]>(known.extras);
+  const [collapsed, setCollapsed] = useState(
+    known.finished || (bag.length > 0 && bag.every((b) => known.packed.includes(b.key)) && known.extras.every((e) => e.done))
+  );
   useEffect(() => {
-    latest.set(date, { packed, finished });
-  }, [date, packed, finished]);
+    latest.set(date, { packed, finished, extras });
+  }, [date, packed, finished, extras]);
   const [, start] = useTransition();
   const card = useRef<HTMLDivElement>(null);
   const open = useRef<HTMLDivElement>(null);
@@ -34,43 +38,27 @@ export default function TodayBag(props: { date: string; bag: BagItem[]; packed: 
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const folding = useRef(false);
 
-  // 직접 추가한 물건: 이 기기에만 저장한다 (서버 기록은 앱이 아는 항목만 받는다). 날마다 따로.
-  const extraKey = `cm_bag_extra_${date}`;
-  const [extras, setExtras] = useState<Extra[]>([]);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
-  useEffect(() => {
-    try {
-      const saved: unknown = JSON.parse(localStorage.getItem(extraKey) ?? "[]");
-      // The device's saved items can only be read once the page is on screen.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (Array.isArray(saved)) setExtras(saved.filter((x): x is Extra => !!x && typeof x.id === "string" && typeof x.name === "string" && typeof x.done === "boolean"));
-    } catch {
-      // No storage (private window): added items just do not persist.
-    }
-  }, [extraKey]);
   const extraDone = extras.filter((e) => e.done).length;
 
-  function saveExtras(list: Extra[]) {
+  // Shown at once; saved in the background (the server keeps the whole day's list).
+  function saveExtras(list: Extra[], change: ExtraChange) {
     setExtras(list);
-    try {
-      localStorage.setItem(extraKey, JSON.stringify(list));
-    } catch {
-      // see above
-    }
+    start(() => saveBagExtras(date, list, change));
   }
   function addExtra() {
     const name = draft.trim().slice(0, 12);
     if (!name || extras.length >= 8) return;
-    saveExtras([...extras, { id: Date.now().toString(36), name, done: false }]);
+    saveExtras([...extras, { id: Date.now().toString(36), name, done: false }], { action: "add", name });
     setDraft("");
     setAdding(false);
   }
   function toggleExtra(id: string) {
     clearTimeout(timer.current);
     const list = extras.map((e) => (e.id === id ? { ...e, done: !e.done } : e));
-    saveExtras(list);
     const target = list.find((e) => e.id === id);
+    if (target) saveExtras(list, { action: target.done ? "pack" : "unpack", name: target.name });
     if (target?.done) navigator.vibrate?.(6);
     // everything packed: fold the card, as when the last bag item is ticked
     if (target?.done && bag.length > 0 && packed.length + list.filter((e) => e.done).length === bag.length + list.length) timer.current = setTimeout(() => fold(true), 620);
@@ -93,7 +81,7 @@ export default function TodayBag(props: { date: string; bag: BagItem[]; packed: 
           <button
             type="button"
             aria-label={`${e.name} 지우기`}
-            onClick={() => saveExtras(extras.filter((x) => x.id !== e.id))}
+            onClick={() => saveExtras(extras.filter((x) => x.id !== e.id), { action: "remove", name: e.name })}
             className="absolute -right-1 -top-1 grid h-[18px] w-[18px] place-items-center rounded-full bg-[#9a9a9a] text-white"
           >
             <CloseIcon size={10} />

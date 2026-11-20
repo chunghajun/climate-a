@@ -1,4 +1,4 @@
-dimport { cookies } from "next/headers";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getBag, getTester, listEvents, listPlaces } from "@/lib/data";
@@ -83,7 +83,7 @@ export default async function Home() {
 
       {wxPlaces.length > 0 && (
         <div className="mt-3">
-          {todayEvents.length > 0 && <TodayBag key={today} date={today} bag={bag} packed={bagState.packed} finished={bagState.finished} />}
+          {todayEvents.length > 0 && <TodayBag key={today} date={today} bag={bag} packed={bagState.packed} finished={bagState.finished} extras={bagState.extras} />}
           {places.length === 0 && (
             <p className="mb-2 px-1 text-[12.5px] text-muted">
               서울 기준 날씨예요. 장소를 입력하면 더 정확하게 알려 드려요.{" "}

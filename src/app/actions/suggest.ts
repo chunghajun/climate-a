@@ -6,7 +6,8 @@ import { db } from "@/lib/firebase";
 import { getEvent, logEvent, requireTester, testerRef, wakeCron } from "@/lib/data";
 import type { CalEvent } from "@/lib/types";
 
-export type Choice = { kind: "move"; start: string; end: string } | { kind: "indoor" } | { kind: "keep" };
+// "ack" = 비 주의 card read ("확인했어요"); nothing about the plan changes. move/indoor stay for old data.
+export type Choice = { kind: "move"; start: string; end: string } | { kind: "indoor" } | { kind: "keep" } | { kind: "ack" };
 
 // Applies the tester's answer to a change suggestion. A repeating event is changed
 // for that one day only: the day is skipped and a one-off copy is made.
@@ -18,7 +19,7 @@ export async function answerSuggestion(suggestionId: string, choice: Choice) {
   if (!snap.exists || snap.data()!.code !== tester.code || snap.data()!.choice) return;
   const { eventId, date } = snap.data()!;
 
-  if (choice.kind !== "keep") {
+  if (choice.kind === "move" || choice.kind === "indoor") {
     const event = await getEvent(tester.code, eventId);
     if (!event) return;
     const patch: Partial<CalEvent> =

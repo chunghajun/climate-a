@@ -4,7 +4,7 @@ import type { AlertPrefs } from "@/lib/types";
 import { logout } from "../actions/auth";
 import { deletePlace, saveAlertPrefs } from "../actions/settings";
 import PageHeader, { GuideButton } from "@/components/page-header";
-import { AdviceBadge, Legend } from "@/components/icons";
+import { AdviceBadge, Legend, WeatherIcon } from "@/components/icons";
 import { ChevronDownIcon } from "@/components/line-icons";
 import NotifySettings from "./notify-settings";
 import SubmitButton from "@/components/submit-button";
@@ -18,7 +18,7 @@ const ALERTS: { key: keyof AlertPrefs; title: string; sub: string }[] = [
   { key: "outfit", title: "옷차림", sub: "그날 입으면 좋을 옷" },
   { key: "heat", title: "폭염", sub: "체감온도 33° 이상일 때" },
   { key: "range", title: "일교차", sub: "하루 최고·최저 차이가 10° 이상일 때" },
-  { key: "suggestion", title: "일정 바꾸기 제안", sub: "옮길 수 있는 야외 일정에 비가 올 때" },
+  { key: "suggestion", title: "유동 일정 비 주의", sub: "옮길 수 있는 일정에 비가 올 때" },
 ];
 
 export default async function SettingsPage() {
@@ -52,7 +52,7 @@ export default async function SettingsPage() {
               {ALERTS.map((a) => (
                 <label key={a.key} className="flex cursor-pointer items-center gap-3 py-3">
                   {a.key === "suggestion" ? (
-                    <span className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-[10px] bg-sky text-sm text-blue">↻</span>
+                    <span className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-[10px] bg-sky text-blue"><WeatherIcon kind="rain" size={22} /></span>
                   ) : (
                     <AdviceBadge k={a.key === "outfit" ? "o5" : a.key} size={30} />
                   )}

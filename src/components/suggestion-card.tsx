@@ -1,54 +1,53 @@
 "use client";
 
 import { useState } from "react";
-import { answerSuggestion, type Choice } from "@/app/actions/suggest";
+import { answerSuggestion } from "@/app/actions/suggest";
+import { WeatherIcon } from "@/components/icons";
 import type { Suggestion } from "@/lib/suggest";
 
+// 비 주의: a movable (유동) plan that may get rain. It only tells; nothing about the plan changes.
+// "확인했어요" records that the tester saw it (H3 data), then the card folds into one line.
 export default function SuggestionCard({ s, dayLabel }: { s: Suggestion; dayLabel?: string }) {
-  const [done, setDone] = useState("");
+  const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
+  const pop = s.pop ?? null;
+  const tip = pop !== null && pop >= 60 ? "우산을 꼭 챙기세요." : "접는 우산을 챙기면 좋아요.";
 
-  async function answer(choice: Choice, message: string) {
+  async function ack() {
     setBusy(true);
-    await answerSuggestion(s.id, choice);
-    setDone(message);
+    await answerSuggestion(s.id, { kind: "ack" });
+    setDone(true);
     setBusy(false);
   }
 
-  if (done) return <p className="rounded-[20px] border border-line bg-white p-4 text-sm font-semibold text-navy">{done}</p>;
-
-  const btn = "w-full rounded-xl border border-line bg-paper px-3 py-3 text-left font-semibold disabled:opacity-50";
-  return (
-    <section className="rounded-[20px] border border-line border-l-4 border-l-coral bg-white p-4">
-      <p className="text-[11px] font-extrabold tracking-[.06em] text-coral">일정 바꿔 보기{dayLabel ? ` · ${dayLabel}` : ""}</p>
-      <h2 className="mt-1.5 font-serif text-lg font-bold leading-snug">
-        {s.title}({s.start}) 할 때 비 올 확률이 {s.pop ?? "-"}%예요
-      </h2>
-      <p className="mt-1 text-sm text-muted">
-        {s.moves.length ? "비를 피할 수 있는 시간을 찾아봤어요. 이렇게 바꿔 볼까요?" : "오늘은 비를 피할 시간이 마땅치 않아요. 실내에서 해 보는 건 어때요?"}
+  if (done)
+    return (
+      <p className="rounded-[18px] bg-gray px-4 py-3 text-sm text-soft">
+        <b className="text-ink">{s.title}</b> 비 소식 확인했어요. 조심히 다녀오세요.
       </p>
-      <div className="mt-3 space-y-2">
-        {s.moves.map((m) => (
-          <button
-            key={m.start}
-            disabled={busy}
-            className={btn}
-            onClick={() => answer({ kind: "move", start: m.start, end: m.end }, `${m.start}로 옮겼어요. 그 시간 기준으로 다시 알려 드릴게요!`)}
-          >
-            {m.start}–{m.end}로 옮기기 <span className="font-normal text-muted">· 비 {s.pop ?? "-"}% → {m.pop}%</span>
-          </button>
-        ))}
-        <button disabled={busy} className={btn} onClick={() => answer({ kind: "indoor" }, "실내 일정으로 바꿨어요. 비 걱정 없이 다녀오세요!")}>
-          실내에서 하기
-        </button>
-        <button
-          disabled={busy}
-          className="w-full py-2 text-sm text-muted underline"
-          onClick={() => answer({ kind: "keep" }, "그대로 둘게요. 우산 꼭 챙기세요")}
-        >
-          그대로 할게요
-        </button>
+    );
+
+  return (
+    <section className="rounded-[20px] border-[1.5px] border-sky2 bg-white p-4">
+      <p className="text-[12.5px] font-bold text-blue">비 주의{dayLabel ? ` · ${dayLabel}` : ""}</p>
+      <h2 className="mt-1.5 text-[17px] font-extrabold leading-snug tracking-[-.02em]">{s.title} 때 비가 올 수 있어요</h2>
+      <div className="mt-3 flex items-center gap-3 rounded-[14px] bg-gray px-3.5 py-3">
+        <span className="text-[16px] font-extrabold">{s.start}</span>
+        <span className="min-w-0 flex-1 border-l-2 border-[#C9C9CE] pl-3">
+          <b className="block truncate text-[15px]">{s.title}</b>
+          <span className="block text-[12.5px] text-muted">
+            {s.start}–{s.end}{s.setting ? ` · ${s.setting === "indoor" ? "실내" : "야외"}` : ""}
+          </span>
+        </span>
+        <span className="flex flex-col items-center">
+          <WeatherIcon kind="rain" size={26} />
+          <b className="text-[13px] font-extrabold text-blue">비 {pop ?? "-"}%</b>
+        </span>
       </div>
+      <p className="mx-0.5 mt-2.5 text-[13.5px] text-soft">{tip}</p>
+      <button type="button" disabled={busy} onClick={ack} className="mt-3 h-11 w-full rounded-[13px] bg-gray text-[15px] font-extrabold disabled:opacity-50">
+        확인했어요
+      </button>
     </section>
   );
 }

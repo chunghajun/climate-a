@@ -23,7 +23,7 @@ const CATCH_UP = 15;
 const SUGGEST_AHEAD = 2 * 60; // change suggestions only while this much time is left
 const QUIET_START = 22 * 60; // no suggestion pushes 22시–7시
 const QUIET_END = 7 * 60;
-const RECHECK = 60; // minutes: forecast changes (suggestions) are looked at this often
+const RECHECK = 30; // minutes: forecast changes (suggestions) are looked at this often
 
 webpush.setVapidDetails(
   process.env.VAPID_SUBJECT!.trim(),
@@ -184,8 +184,8 @@ export async function GET(request: Request) {
         summary.sent++;
       }
 
-      // 일정 바꾸기 제안: pushed as soon as one is found (07–22시), once per event,
-      // while there are still 2+ hours to change plans.
+      // 비 주의: pushed as soon as one is found (07–22시), once per movable (유동) event,
+      // while there are still 2+ hours before leaving.
       if (prefs.suggestion && minutes >= QUIET_END && minutes < QUIET_START) {
         const found = [
           ...suggestionsFor(code, date, planned, minutes),
@@ -207,10 +207,8 @@ export async function GET(request: Request) {
           await openSuggestions(code, [s], "alert");
           const day = s.date === date ? "오늘" : "내일";
           const message = {
-            title: `↻ ${s.title}, 시간을 옮겨 볼까요?`,
-            body: `${day} ${s.start} ${s.title}에 비 올 확률이 ${s.pop ?? "-"}%예요. ${
-              s.moves.length ? `${s.moves.map((m) => m.start).join(" 또는 ")}엔 비 걱정이 적어요.` : "실내로 바꾸는 것도 방법이에요."
-            }`,
+            title: `${s.title} 때 비 소식이 있어요`,
+            body: `${day} ${s.start} ${s.title}에 비 올 확률이 ${s.pop ?? "-"}%예요. ${(s.pop ?? 0) >= 60 ? "우산을 꼭 챙기세요." : "접는 우산을 챙기면 좋아요."}`,
           };
           const delivered = await pushTo(code, { ...message, tag: ref.id, url: "/" });
           await ref.update({ title: message.title, body: message.body, delivered, sentAt: FieldValue.serverTimestamp() });

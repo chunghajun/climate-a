@@ -89,10 +89,16 @@ export function wakeCron(code: string) {
   after(() => testerRef(code).update({ cronNextAt: 0 }));
 }
 
-// The day's bag (testers/{code}/bag/{date}): items ticked as packed, and whether 완료 was pressed.
-export async function getBag(code: string, date: string): Promise<{ packed: string[]; finished: boolean }> {
+export type BagExtra = { id: string; name: string; done: boolean };
+
+// The day's bag (testers/{code}/bag/{date}): items ticked as packed, whether 완료 was pressed,
+// and the things the tester added by hand (with their own ticks).
+export async function getBag(code: string, date: string): Promise<{ packed: string[]; finished: boolean; extras: BagExtra[] }> {
   const d = (await testerRef(code).collection("bag").doc(date).get()).data();
-  return { packed: d?.packed ?? [], finished: !!d?.finished };
+  const extras: BagExtra[] = Array.isArray(d?.extras)
+    ? d.extras.filter((x: BagExtra) => !!x && typeof x.id === "string" && typeof x.name === "string" && typeof x.done === "boolean")
+    : [];
+  return { packed: d?.packed ?? [], finished: !!d?.finished, extras };
 }
 
 // Research event log: one document per user action, analysed after the test.

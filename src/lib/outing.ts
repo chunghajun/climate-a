@@ -183,7 +183,7 @@ export function composeMessage(o: Outing, a: Assessment, opts: MessageOptions): 
   if (heat) extras.push(`체감 ${heat}°로 무더워요. 물을 챙기고 그늘로 다니세요.`);
   if (colder) extras.push(`어제보다 ${colder}도 쌀쌀해요${wear ? ` · ${wear} 추천` : ""}.`);
   if (range) extras.push(`일교차가 ${range.hi - range.lo}도라 겉옷 하나 챙기세요.`);
-  if (opts.suggestionHint && prefs.suggestion) extras.push("비를 피할 다른 시간도 찾아뒀어요 👉");
+  if (opts.suggestionHint && prefs.suggestion) extras.push("일정별 비 소식은 앱에서 확인하세요.");
 
   let title: string;
   let lead: string;

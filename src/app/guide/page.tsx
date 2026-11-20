@@ -26,10 +26,10 @@ const SIGNATURE: { title: string; body: string; why: string; visual: React.React
     ),
   },
   {
-    title: "비 피하기 일정 제안",
-    body: "옮길 수 있는 야외 일정에 비가 오면, 비가 덜 오는 시간이나 실내로 바꾸자고 제안해요.",
-    why: "날씨를 보고 일정 자체를 고쳐 주는 기능은 다른 앱에 없어요.",
-    visual: <span className="text-2xl">↻</span>,
+    title: "유동 일정 비 주의",
+    body: "옮길 수 있다고 표시한 일정 시간에 비 소식이 있으면, 그 일정에 비가 온다고 미리 짚어 드려요.",
+    why: "하루 날씨가 아니라 내 일정 시간의 날씨를 봐요.",
+    visual: <WeatherIcon kind="rain" size={30} />,
   },
   {
     title: "날씨가 겹쳐 보이는 플래너",
